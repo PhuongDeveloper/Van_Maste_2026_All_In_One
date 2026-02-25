@@ -578,7 +578,7 @@ export default function ExamPage({ diagnosticMode = false, onDiagnosticDone, onG
             </div>
 
             {/* Grading result overlay */}
-            {showGrading && gradeResult && (
+            {showGrading && gradeResult && examId != null && (
                 <GradingResult
                     grade={gradeResult}
                     examId={examId}
