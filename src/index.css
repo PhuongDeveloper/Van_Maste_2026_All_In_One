@@ -105,18 +105,69 @@ body,
   gap: 16px;
 }
 
-@media (max-width: 900px) {
-  .sidebar {
-    display: none;
-  }
-}
-
 .main-area {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   min-width: 0;
+}
+
+/* Mobile layout tweaks */
+@media (max-width: 768px) {
+  .app-body {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    display: none; /* ẩn sidebar cố định, dùng overlay mobile */
+  }
+  .app-header {
+    padding: 0 12px;
+    height: 54px;
+    border-bottom-left-radius: 18px;
+    border-bottom-right-radius: 18px;
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.35);
+  }
+  .logo-text {
+    font-size: 18px;
+  }
+  .countdown-chip {
+    display: none;
+  }
+  .hdr-icon-btn {
+    width: 30px;
+    height: 30px;
+  }
+  .hdr-avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+
+  .hdr-bell-btn {
+    display: none; /* ẩn chuông trên mobile để chừa chỗ cho nút cài đặt */
+  }
+  .chat-scroll {
+    padding: 12px 12px 4px;
+  }
+  .input-bar {
+    padding: 8px 10px;
+  }
+  .quick-actions {
+    gap: 4px;
+  }
+  .qa-btn {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+  .chat-input {
+    font-size: 13px;
+  }
+  .icon-btn {
+    width: 40px;
+    height: 40px;
+  }
 }
 
 /* ── App Header (Premium redesign) ────────────────── */
@@ -247,6 +298,34 @@ body,
   transform: scale(1.08);
 }
 
+/* ── Mobile-specific header overrides (placed AFTER base header styles) ───── */
+@media (max-width: 768px) {
+  .app-header {
+    padding: 0 10px;
+    height: 52px;
+    justify-content: space-between;
+  }
+
+  .countdown-chip {
+    display: none;
+  }
+
+  .hdr-bell-btn {
+    display: none;
+  }
+
+  .hdr-icon-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  .hdr-avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+}
+
 /* ── Tab Nav (Premium bottom-line style) ─────────── */
 .tab-nav {
   background: var(--color-surface);
@@ -310,6 +389,17 @@ body,
 
 .tab-indicator {
   display: none;
+}
+
+/* Ẩn tab Lộ Trình trên desktop, chỉ hiện trên mobile */
+.tab-mobile-only {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .tab-mobile-only {
+    display: flex;
+  }
 }
 
 
@@ -475,6 +565,47 @@ body,
   height: 100%;
   object-fit: cover;
   border-radius: inherit;
+}
+
+/* Mobile sidebar overlay */
+@media (max-width: 768px) {
+  .mobile-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(4px);
+    z-index: 40;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+
+  .mobile-sidebar-sheet {
+    width: 100%;
+    max-height: 70vh;
+    background: var(--color-surface);
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -8px 30px rgba(15, 23, 42, 0.35);
+    overflow-y: auto;
+  }
+}
+
+/* Roadmap page reuses sidebar but full-width on mobile */
+.roadmap-page {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .roadmap-page {
+    display: block;
+  }
+  .roadmap-page .sidebar {
+    display: flex;
+    width: 100%;
+    border-right: none;
+    border-bottom: none;
+    padding: 16px 12px 24px;
+  }
 }
 
 .bubble {
@@ -964,6 +1095,32 @@ body,
   font-size: 11.5px;
   margin-top: 3px;
   opacity: .9;
+}
+
+/* Exam layout responsive */
+.exam-layout {
+  display: flex;
+}
+
+.exam-left,
+.exam-right {
+  width: 50%;
+}
+
+@media (max-width: 768px) {
+  .exam-layout {
+    flex-direction: column;
+  }
+  .exam-left,
+  .exam-right {
+    width: 100%;
+  }
+  .exam-left {
+    max-height: 45vh;
+  }
+  .exam-right {
+    flex: 1;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════

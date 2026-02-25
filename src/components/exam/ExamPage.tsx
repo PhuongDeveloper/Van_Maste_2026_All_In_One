@@ -339,10 +339,10 @@ export default function ExamPage({ diagnosticMode = false, onDiagnosticDone, onG
             </div>
 
             {/* ── Main split layout ── */}
-            <div className="flex flex-1 overflow-hidden relative">
+            <div className="flex flex-1 overflow-hidden relative exam-layout">
 
                 {/* LEFT — Exam paper viewer */}
-                <div className="w-1/2 border-r border-slate-200 overflow-y-auto bg-[#f8f9fa] relative">
+                <div className="w-1/2 border-r border-slate-200 overflow-y-auto bg-[#f8f9fa] relative exam-left">
                     {status === 'loading' && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#f8f9fa]">
                             <Loader2 className="animate-spin text-[#0EA5E9]" size={36} />
@@ -394,7 +394,7 @@ export default function ExamPage({ diagnosticMode = false, onDiagnosticDone, onG
                 </div>
 
                 {/* RIGHT — Answer paper */}
-                <div className="w-1/2 overflow-y-auto flex flex-col" style={{ background: '#fffef7' }}>
+                <div className="w-1/2 overflow-y-auto flex flex-col exam-right" style={{ background: '#fffef7' }}>
                     {/* Paper header */}
                     <div className="px-6 pt-5 pb-3 border-b-2 border-slate-300">
                         <div className="text-center mb-3">

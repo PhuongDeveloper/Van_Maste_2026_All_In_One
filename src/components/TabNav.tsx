@@ -1,17 +1,19 @@
 import React from 'react';
-import { BookOpen, FileText, Trophy } from 'lucide-react';
+import { BookOpen, FileText, Trophy, Map } from 'lucide-react';
 
-type Tab = 'chat' | 'home' | 'exam' | 'stats';
+type Tab = 'chat' | 'exam' | 'stats' | 'roadmap';
 
 interface TabNavProps {
     active: Tab;
     onChange: (t: Tab) => void;
 }
 
-const TABS: { id: Tab; label: string; icon: React.ReactNode; emoji: string }[] = [
+const TABS: { id: Tab; label: string; icon: React.ReactNode; emoji: string; mobileOnly?: boolean }[] = [
     { id: 'chat', label: 'Học Bài', icon: <BookOpen size={15} />, emoji: '📚' },
     { id: 'exam', label: 'Làm Bài', icon: <FileText size={15} />, emoji: '✍️' },
     { id: 'stats', label: 'Kỷ Lục', icon: <Trophy size={15} />, emoji: '🏆' },
+    // Chỉ hiện trên mobile: trang Lộ Trình chứa nội dung sidebar
+    { id: 'roadmap', label: 'Lộ Trình', icon: <Map size={15} />, emoji: '🗺️', mobileOnly: true },
 ];
 
 export default function TabNav({ active, onChange }: TabNavProps) {
@@ -21,7 +23,7 @@ export default function TabNav({ active, onChange }: TabNavProps) {
                 {TABS.map(t => (
                     <button
                         key={t.id}
-                        className={`tab-btn ${active === t.id ? 'active' : ''}`}
+                        className={`tab-btn ${t.mobileOnly ? 'tab-mobile-only' : ''} ${active === t.id ? 'active' : ''}`}
                         onClick={() => onChange(t.id)}
                     >
                         <span className="tab-icon">{t.icon}</span>

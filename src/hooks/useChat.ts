@@ -413,23 +413,14 @@ Phong cách: màu sắc ấm, chữ dễ đọc, phù hợp học sinh ôn thi t
         try {
             const { text: aiContent, generatedImageUrl } = await sendChatMessage(messages, val, previewImage);
 
-            // ── Detect [INFOGRAPHIC] tag → call nanobanana pro ────────────────
-            let finalText = aiContent;
-            let infographicUrl: string | null = generatedImageUrl;
-
+            // ── Detect [INFOGRAPHIC] tag → tạo ảnh infographic im lặng ─────────
             const infMatch = aiContent.match(/\[INFOGRAPHIC\]([^\[]*)\[\/INFOGRAPHIC\]/);
             if (infMatch) {
                 const workTitle = infMatch[1].trim();
-                finalText = aiContent.replace(/\[INFOGRAPHIC\][^\[]*\[\/INFOGRAPHIC\]/g,
-                    `Đang tạo infographic về "${workTitle}"...`);
-                // Show loading message immediately
-                setMessages(p => {
-                    const next = [...p, { role: 'assistant' as const, content: finalText }];
-                    resetProactiveTimer(next);
-                    return next;
-                });
-                playNotification();
-                // Generate in background
+                const ack = `Chờ chút, thầy sẽ tóm tắt và tạo infographic về "${workTitle}" cho em nhé.`;
+                addAssistant(ack);
+
+                // Tạo infographic ở background, chỉ gửi 1 tin mới khi ảnh xong
                 generateInfographic(workTitle).then(imgUrl => {
                     if (imgUrl) {
                         setMessages(p => {
@@ -449,16 +440,33 @@ Phong cách: màu sắc ấm, chữ dễ đọc, phù hợp học sinh ôn thi t
                         addAssistant(`Không thể tạo infographic về "${workTitle}". API chưa hỗ trợ hoặc lỗi kết nối.`);
                     }
                 });
-            } else {
+            } else if (generatedImageUrl) {
+                // Trường hợp Gemini trả về [GEN_IMAGE] → chỉ nói ngắn gọn rồi gửi ảnh
+                const ack = 'Chờ chút, thầy sẽ tạo ảnh minh hoạ cho em ngay đây.';
                 setMessages(p => {
-                    const next = [...p, { role: 'assistant' as const, content: finalText, generatedImage: infographicUrl }];
+                    const next = [
+                        ...p,
+                        {
+                            role: 'assistant' as const,
+                            content: ack,
+                            generatedImage: generatedImageUrl,
+                        },
+                    ];
                     resetProactiveTimer(next);
                     return next;
                 });
                 playNotification();
+                autoSpeak(ack);
+            } else {
+                // Chat văn bản bình thường
+                setMessages(p => {
+                    const next = [...p, { role: 'assistant' as const, content: aiContent }];
+                    resetProactiveTimer(next);
+                    return next;
+                });
+                playNotification();
+                if (aiContent) autoSpeak(aiContent);
             }
-
-            if (finalText) autoSpeak(finalText);
             if (user && userProfile) {
                 import('../services/firebaseService').then(({ updateUserProfile }) => {
                     updateUserProfile(user.uid, {

@@ -10,17 +10,18 @@ import Sidebar from './components/Sidebar';
 import ChatMessage from './components/chat/ChatMessage';
 import SettingsPanel from './components/settings/SettingsPanel';
 import ExamPage from './components/exam/ExamPage';
-import HomeTab from './components/home/HomeTab';
+// import HomeTab from './components/home/HomeTab';
 import type { ExamGrade } from './types';
 import './index.css';
 
-type Tab = 'chat' | 'home' | 'exam' | 'stats';
+type Tab = 'chat' | 'exam' | 'stats' | 'roadmap';
 
 function AppContent() {
   const { user, userProfile, loading } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('chat');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isDiagnosing, setIsDiagnosing] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   const onStartDiagnosticExam = useCallback(() => {
     setIsDiagnosing(true);
@@ -77,7 +78,25 @@ function AppContent() {
 
   return (
     <div className="app-shell">
-      <Header onOpenSettings={() => setSettingsOpen(true)} />
+      <Header
+        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSidebar={() => setMobileSidebarOpen(true)}
+      />
+
+      {/* Mobile sidebar overlay (profile & stats) */}
+      {userProfile && mobileSidebarOpen && (
+        <div
+          className="mobile-sidebar-backdrop"
+          onClick={() => setMobileSidebarOpen(false)}
+        >
+          <div
+            className="mobile-sidebar-sheet"
+            onClick={e => e.stopPropagation()}
+          >
+            <Sidebar profile={userProfile} />
+          </div>
+        </div>
+      )}
 
       <div className="app-body">
         {/* Left Sidebar — desktop only */}
@@ -177,19 +196,12 @@ function AppContent() {
             </>
           )}
 
-          {/* Home Tab */}
-          {activeTab === 'home' && <HomeTab
-            userData={{
-              level: userProfile?.level || 'Tân Binh',
-              status: 'Sẵn sàng chiến',
-              progress: userProfile?.progress || 5,
-              xp: userProfile?.xp || 0,
-              streak: userProfile?.streak || 1,
-              daysLeft: 0,
-            }}
-            isDiagnosing={isDiagnosing}
-            onStartDiagnosis={() => { setIsDiagnosing(true); setActiveTab('exam'); }}
-          />}
+          {/* Roadmap Tab (mobile: chứa nội dung sidebar) */}
+          {activeTab === 'roadmap' && userProfile && (
+            <div className="roadmap-page">
+              <Sidebar profile={userProfile} />
+            </div>
+          )}
 
           {/* Exam Tab */}
           {activeTab === 'exam' && (

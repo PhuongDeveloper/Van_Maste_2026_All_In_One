@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Volume2, LogOut, User, Trophy, Zap, ChevronRight } from 'lucide-react';
+import { X, Volume2, LogOut, User, Trophy, Zap, ChevronRight, Settings } from 'lucide-react';
 import { logout, updateUserProfile } from '../../services/firebaseService';
 import { useAuth } from '../../context/AuthContext';
 import { PRONOUN_MAP, TTS_VOICE_MAP } from '../../constants';
@@ -49,7 +49,7 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                 {/* ── Top bar ── */}
                 <div className="sp-topbar">
                     <div className="sp-title">
-                        <span>⚙️</span>
+                        <Settings size={18} />
                         <span>Cài đặt</span>
                     </div>
                     <button className="sp-close-btn" onClick={onClose}>
@@ -113,7 +113,6 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                                 onClick={() => handleVoiceChange('female')}
                                 disabled={saving}
                             >
-                                <span className="sp-voice-emoji">👩</span>
                                 <span>Giọng Nữ</span>
                                 <span className="sp-voice-pronoun">Xưng: Cô</span>
                             </button>
@@ -122,7 +121,6 @@ export default function SettingsPanel({ open, onClose }: SettingsPanelProps) {
                                 onClick={() => handleVoiceChange('male')}
                                 disabled={saving}
                             >
-                                <span className="sp-voice-emoji">👨</span>
                                 <span>Giọng Nam</span>
                                 <span className="sp-voice-pronoun">Xưng: Thầy</span>
                             </button>

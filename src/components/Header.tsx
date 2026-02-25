@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 
 interface HeaderProps {
     onOpenSettings: () => void;
+    onOpenSidebar?: () => void;
 }
 
 function daysLeft() {
@@ -12,7 +13,7 @@ function daysLeft() {
     ));
 }
 
-export default function Header({ onOpenSettings }: HeaderProps) {
+export default function Header({ onOpenSettings, onOpenSidebar }: HeaderProps) {
     const { userProfile } = useAuth();
     const diff = daysLeft();
     const pct = Math.min(100, Math.round(100 - (diff / 365) * 100));
@@ -38,7 +39,7 @@ export default function Header({ onOpenSettings }: HeaderProps) {
             <div style={{ flex: 1 }} />
 
             {/* Notification (future feature placeholder) */}
-            <button className="hdr-icon-btn" title="Thông báo" style={{ position: 'relative' }}>
+            <button className="hdr-icon-btn hdr-bell-btn" title="Thông báo" style={{ position: 'relative' }}>
                 <Bell size={17} />
                 <span className="notif-dot" />
             </button>
@@ -48,8 +49,12 @@ export default function Header({ onOpenSettings }: HeaderProps) {
                 <Settings size={17} />
             </button>
 
-            {/* User avatar */}
-            <button className="hdr-avatar" onClick={onOpenSettings} title="Hồ sơ của bạn">
+            {/* User avatar (desktop: mở cài đặt, mobile: mở sidebar) */}
+            <button
+                className="hdr-avatar"
+                onClick={onOpenSidebar || onOpenSettings}
+                title="Hồ sơ của bạn"
+            >
                 {initial}
             </button>
         </header>
