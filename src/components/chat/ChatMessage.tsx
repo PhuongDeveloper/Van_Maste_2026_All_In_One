@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { Play } from 'lucide-react';
-import type { Message } from '../../types';
+import { Play, BookOpen, PenLine } from 'lucide-react';
+import type { Message, AIExamData } from '../../types';
 import type { ExamGrade } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 
 interface ChatMessageProps {
     message: Message & { examGrade?: ExamGrade };
     onPlayTTS: (text: string) => void;
+    onStartAIExam?: (exam: AIExamData) => void;
 }
 
 function clean(raw: string): string {
@@ -102,7 +103,75 @@ function GradeBubble({ grade }: { grade: ExamGrade }) {
     );
 }
 
-const ChatMessage: React.FC<ChatMessageProps> = ({ message, onPlayTTS }) => {
+/** Card hiển thị câu hỏi luyện tập theo ngữ cảnh */
+function PracticeBubble({ question }: { question: string }) {
+    return (
+        <div style={{
+            marginTop: 10,
+            background: 'linear-gradient(135deg, #1e3a5f 0%, #0f2744 100%)',
+            border: '1px solid rgba(56,189,248,.3)',
+            borderRadius: 14,
+            padding: '12px 16px',
+        }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <PenLine size={13} color="#38bdf8" />
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                    Câu hỏi luyện tập
+                </span>
+            </div>
+            <p style={{ fontSize: 13.5, color: '#e0f2fe', lineHeight: 1.65, margin: 0 }}>{question}</p>
+        </div>
+    );
+}
+
+/** Card hiển thị đề thi do AI tạo với nút Làm bài */
+function AIExamCard({ exam, onStart }: { exam: AIExamData; onStart: () => void }) {
+    const typeLabel = exam.type === 'reading' ? 'Đọc hiểu' : exam.type === 'writing' ? 'Phần Viết' : 'Tổng hợp';
+    const durationLabel = `${exam.durationMinutes} phút`;
+    const questionCount = exam.questions.length;
+    return (
+        <div style={{
+            marginTop: 10,
+            background: 'linear-gradient(135deg, #1a2e1a 0%, #0f2218 100%)',
+            border: '1px solid rgba(74,222,128,.3)',
+            borderRadius: 16,
+            padding: '14px 16px',
+        }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <BookOpen size={13} color="#4ade80" />
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#4ade80', textTransform: 'uppercase', letterSpacing: '.06em' }}>
+                    Đề thi AI — THPT 2025
+                </span>
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#f0fdf4', marginBottom: 4 }}>{exam.title}</div>
+            {exam.source && <div style={{ fontSize: 11, color: 'rgba(240,253,244,.6)', marginBottom: 8 }}>Ngữ liệu: {exam.source}</div>}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <span style={{ fontSize: 11, background: 'rgba(74,222,128,.15)', color: '#86efac', padding: '2px 8px', borderRadius: 20 }}>{typeLabel}</span>
+                <span style={{ fontSize: 11, background: 'rgba(74,222,128,.15)', color: '#86efac', padding: '2px 8px', borderRadius: 20 }}>{durationLabel}</span>
+                <span style={{ fontSize: 11, background: 'rgba(74,222,128,.15)', color: '#86efac', padding: '2px 8px', borderRadius: 20 }}>{questionCount} câu</span>
+            </div>
+            <button
+                onClick={onStart}
+                style={{
+                    background: 'linear-gradient(135deg, #16a34a, #15803d)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 10,
+                    padding: '8px 20px',
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: 'pointer',
+                    width: '100%',
+                    letterSpacing: '.02em',
+                }}
+            >
+                Làm bài →
+            </button>
+        </div>
+    );
+}
+
+const ChatMessage: React.FC<ChatMessageProps> = ({ message, onPlayTTS, onStartAIExam }) => {
     const isUser = message.role === 'user';
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const { userProfile } = useAuth();
@@ -170,6 +239,12 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, onPlayTTS }) => {
                             </button>
                         )}
                     </div>
+                    {message.practiceQuestion && (
+                        <PracticeBubble question={message.practiceQuestion} />
+                    )}
+                    {message.aiExam && onStartAIExam && (
+                        <AIExamCard exam={message.aiExam} onStart={() => onStartAIExam(message.aiExam!)} />
+                    )}
                     {!isUser && (
                         <button className="tts-btn" onClick={() => onPlayTTS(cleaned)}>
                             <Play size={10} /> Đọc

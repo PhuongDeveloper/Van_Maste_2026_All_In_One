@@ -1,5 +1,5 @@
 import { SYSTEM_PROMPT, CHAT_HISTORY_LIMIT } from '../constants';
-import type { Message, UserProfile } from '../types';
+import type { Message, UserProfile, AIExamData } from '../types';
 
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -261,6 +261,29 @@ Format: vertical infographic, 1024x1536px equivalent proportions.`;
         return null;
     } catch (err) {
         console.error('generateInfographic error:', err);
+        return null;
+    }
+}
+
+/**
+ * Generate an AI exam based on type (reading/writing/full).
+ * Returns parsed AIExamData or null on failure.
+ */
+export async function generateAIExam(prompt: string): Promise<AIExamData | null> {
+    const apiKey = getApiKey();
+    if (!apiKey) return null;
+    try {
+        const res = await fetch(`${GEMINI_BASE_URL}/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+        });
+        const data = await res.json();
+        let raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        raw = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
+        return JSON.parse(raw) as AIExamData;
+    } catch (err) {
+        console.error('generateAIExam error:', err);
         return null;
     }
 }

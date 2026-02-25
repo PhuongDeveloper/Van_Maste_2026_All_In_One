@@ -5,7 +5,7 @@ import { pickRandomExam, fetchDocxAsText, gradeWithAI } from '../../services/exa
 import { saveExamSubmission, updateSubmissionGrade, completeAssessment, saveExamInsights } from '../../services/firebaseService';
 import { useAuth } from '../../context/AuthContext';
 import GradingResult from './GradingResult';
-import type { ExamSubmission, ExamGrade } from '../../types';
+import type { ExamSubmission, ExamGrade, AIExamData } from '../../types';
 
 // ─── Exam state machine ───────────────────────────────────────────────────────
 // idle   = page load; exam blurred, show start overlay
@@ -34,9 +34,11 @@ interface ExamPageProps {
     diagnosticMode?: boolean;
     onDiagnosticDone?: () => void;
     onGradeComplete?: (grade: ExamGrade, resolvedWeaknesses?: string[]) => void;
+    /** If set, render this AI-generated exam instead of loading a DOCX file */
+    aiExam?: AIExamData;
 }
 
-export default function ExamPage({ diagnosticMode = false, onDiagnosticDone, onGradeComplete }: ExamPageProps) {
+export default function ExamPage({ diagnosticMode = false, onDiagnosticDone, onGradeComplete, aiExam }: ExamPageProps) {
     const { user, userProfile, setUserProfile } = useAuth();
     const [examId, setExamId] = useState<number>(() => pickRandomExam());
     const [status, setStatus] = useState<ExamStatus>('loading');
@@ -50,7 +52,7 @@ export default function ExamPage({ diagnosticMode = false, onDiagnosticDone, onG
     const [interimAnswer, setInterimAnswer] = useState('');
 
     // ── Timer ──────────────────────────────────────────────────────────────────
-    const [timeLeft, setTimeLeft] = useState(EXAM_DURATION_SECONDS);
+    const [timeLeft, setTimeLeft] = useState(() => aiExam ? aiExam.durationMinutes * 60 : EXAM_DURATION_SECONDS);
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     const docxContainerRef = useRef<HTMLDivElement>(null);
@@ -98,7 +100,15 @@ export default function ExamPage({ diagnosticMode = false, onDiagnosticDone, onG
         }
     }, []);
 
-    useEffect(() => { loadExam(examId); }, [examId, loadExam]);
+    useEffect(() => {
+        if (aiExam) {
+            // AI-generated exam: skip DOCX loading, go directly to ready state
+            setStatus('ready');
+            setTimeLeft(aiExam.durationMinutes * 60);
+        } else {
+            loadExam(examId);
+        }
+    }, [examId, aiExam, loadExam]);
     useEffect(() => () => { recognitionRef.current?.abort(); }, []);
 
     // ── Timer logic ────────────────────────────────────────────────────────────
@@ -357,17 +367,50 @@ export default function ExamPage({ diagnosticMode = false, onDiagnosticDone, onG
                         </div>
                     )}
 
-                    {/* Blurred exam paper */}
-                    <div
-                        ref={docxContainerRef}
-                        className="px-8 py-6 min-h-full transition-all duration-500"
-                        style={{
-                            display: status === 'error' || status === 'loading' ? 'none' : 'block',
-                            filter: status === 'ready' ? 'blur(8px)' : 'none',
-                            userSelect: status === 'ready' ? 'none' : 'auto',
-                            pointerEvents: status === 'ready' ? 'none' : 'auto',
-                        }}
-                    />
+                    {/* AI Exam content (text-based, no DOCX needed) */}
+                    {aiExam && (status === 'active' || status === 'ready') && (
+                        <div
+                            className="px-8 py-6 min-h-full"
+                            style={{
+                                filter: status === 'ready' ? 'blur(8px)' : 'none',
+                                userSelect: status === 'ready' ? 'none' : 'auto',
+                                pointerEvents: status === 'ready' ? 'none' : 'auto',
+                            }}
+                        >
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#0ea5e9', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 4 }}>Đề thi AI — THPT 2025</div>
+                            <h2 style={{ fontSize: 18, fontWeight: 800, color: '#1e293b', marginBottom: 4 }}>{aiExam.title}</h2>
+                            {aiExam.source && <p style={{ fontSize: 12, color: '#64748b', marginBottom: 16, fontStyle: 'italic' }}>Ngữ liệu: {aiExam.source}</p>}
+                            {aiExam.passage && (
+                                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '14px 16px', fontSize: 13.5, lineHeight: 1.8, color: '#334155', marginBottom: 20, whiteSpace: 'pre-wrap' }}>
+                                    {aiExam.passage}
+                                </div>
+                            )}
+                            {aiExam.questions.map(q => (
+                                <div key={q.id} style={{ marginBottom: 20, paddingBottom: 16, borderBottom: '1px dashed #e2e8f0' }}>
+                                    <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+                                        <span style={{ background: '#0ea5e9', color: '#fff', borderRadius: 6, padding: '1px 7px', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                                            Câu {q.id} ({q.points}đ)
+                                        </span>
+                                        <p style={{ fontSize: 13.5, color: '#1e293b', lineHeight: 1.7, margin: 0 }}>{q.prompt}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Blurred DOCX exam paper (used when no aiExam) */}
+                    {!aiExam && (
+                        <div
+                            ref={docxContainerRef}
+                            className="px-8 py-6 min-h-full transition-all duration-500"
+                            style={{
+                                display: status === 'error' || status === 'loading' ? 'none' : 'block',
+                                filter: status === 'ready' ? 'blur(8px)' : 'none',
+                                userSelect: status === 'ready' ? 'none' : 'auto',
+                                pointerEvents: status === 'ready' ? 'none' : 'auto',
+                            }}
+                        />
+                    )}
 
                     {/* Start overlay */}
                     {status === 'ready' && (

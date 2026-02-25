@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Message } from '../types';
 import type { ExamGrade } from '../types';
+import type { AIExamData } from '../types';
 import {
     EXAM_DATE,
     DAILY_QUOTE,
@@ -8,7 +9,11 @@ import {
     ONBOARDING_WELCOME_TEMPLATE,
     PRONOUN_MAP,
     PROACTIVE_PROMPT,
+    PROACTIVE_DELAY_MS,
     QUIZ_GENERATION_PROMPT,
+    AI_EXAM_PROMPT_READING,
+    AI_EXAM_PROMPT_WRITING,
+    AI_EXAM_PROMPT_FULL,
 } from '../constants';
 import {
     sendChatMessage,
@@ -19,6 +24,7 @@ import {
     generateDiagnosticMCQ,
     generateInfographic,
     generateImage,
+    generateAIExam,
 } from '../services/geminiApi';
 import type { DiagnosticQuizData } from '../services/geminiApi';
 import { playTTS } from '../services/ttsService';
@@ -67,6 +73,7 @@ export function useChat(onStartDiagnosticExam?: () => void) {
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const [awaitingScore, setAwaitingScore] = useState(false);
     const [awaitingTestChoice, setAwaitingTestChoice] = useState(false);
+    const [awaitingExamTypeChoice, setAwaitingExamTypeChoice] = useState(false);
     const [quizState, setQuizState] = useState<QuizState>(QUIZ_INIT);
     const [pendingGraphicPrompt, setPendingGraphicPrompt] = useState(false);
 
@@ -169,7 +176,7 @@ B. Trả lời 10 câu trắc nghiệm nhanh`;
                 setMessages(p => [...p, { role: 'assistant', content: question }]);
                 playNotification();
             }
-        }, 15_000); // 15 seconds
+        }, PROACTIVE_DELAY_MS); // 25 seconds
     }, [userProfile?.isOnboarded]);
 
     // Clean up timer on unmount
@@ -376,9 +383,24 @@ Phong cách: màu sắc ấm, chữ dễ đọc, phù hợp học sinh ôn thi t
             return;
         }
 
-        // ── Tự phát hiện yêu cầu tạo đồ hoạ từ câu chat ──────────────────────
         const lower = val.toLowerCase();
-        const wantsGraphic = /(đồ hoạ|đồ họa|đồ họa|infographic|poster|ảnh minh hoạ|ảnh minh họa|tạo ảnh|vẽ giúp em)/i.test(lower);
+
+        // ── Awaiting exam type choice (A/B/C) ────────────────────────────────
+        if (awaitingExamTypeChoice) {
+            const ch = lower.trim().slice(0, 1);
+            await handleExamTypeChoice(ch);
+            return;
+        }
+
+        // ── Detect exam generation requests from chat ─────────────────────────
+        const wantsExam = /tạo\s*đề|ra\s*đề|cho em\s*đề|đề thi ngữ văn|thầy\s*ra\s*đề/i.test(lower);
+        if (wantsExam) {
+            startExamFlow();
+            return;
+        }
+
+        // ── Detect graphics request ─────────────────────────────────────────
+        const wantsGraphic = /(đồ hoạ|đồ họa|infographic|poster|ảnh minh hoạ|ảnh minh họa|tạo ảnh|vẽ giúp em)/i.test(lower);
         if (wantsGraphic) {
             askGraphicTopic();
             return;
@@ -458,14 +480,42 @@ Phong cách: màu sắc ấm, chữ dễ đọc, phù hợp học sinh ôn thi t
                 playNotification();
                 autoSpeak(ack);
             } else {
-                // Chat văn bản bình thường
+                // ── Normal text response — parse [PRACTICE] and [AI_EXAM] tags ──
+                let cleanContent = aiContent;
+                let practiceQuestion: string | null = null;
+                let aiExamData: AIExamData | null = null;
+
+                // Parse [PRACTICE]...[/PRACTICE]
+                const practiceMatch = cleanContent.match(/\[PRACTICE\]([\s\S]*?)\[\/PRACTICE\]/);
+                if (practiceMatch) {
+                    practiceQuestion = practiceMatch[1].trim();
+                    cleanContent = cleanContent.replace(/\[PRACTICE\][\s\S]*?\[\/PRACTICE\]/, '').trim();
+                }
+
+                // Parse [AI_EXAM] {...} [/AI_EXAM]
+                const examMatch = cleanContent.match(/\[AI_EXAM\]([\s\S]*?)\[\/AI_EXAM\]/);
+                if (examMatch) {
+                    try {
+                        aiExamData = JSON.parse(examMatch[1].trim());
+                    } catch { /* ignore malformed */ }
+                    cleanContent = cleanContent.replace(/\[AI_EXAM\][\s\S]*?\[\/AI_EXAM\]/, '').trim();
+                }
+
                 setMessages(p => {
-                    const next = [...p, { role: 'assistant' as const, content: aiContent }];
+                    const next = [
+                        ...p,
+                        {
+                            role: 'assistant' as const,
+                            content: cleanContent,
+                            ...(practiceQuestion ? { practiceQuestion } : {}),
+                            ...(aiExamData ? { aiExam: aiExamData } : {}),
+                        },
+                    ];
                     resetProactiveTimer(next);
                     return next;
                 });
                 playNotification();
-                if (aiContent) autoSpeak(aiContent);
+                if (cleanContent) autoSpeak(cleanContent);
             }
             if (user && userProfile) {
                 import('../services/firebaseService').then(({ updateUserProfile }) => {
@@ -525,6 +575,44 @@ Phong cách: màu sắc ấm, chữ dễ đọc, phù hợp học sinh ôn thi t
         }
     };
 
+    // ── Awaiting exam type choice ─────────────────────────────────────────────
+    const startExamFlow = useCallback(() => {
+        setAwaitingExamTypeChoice(true);
+        const syntheticUser: Message = { role: 'user', content: 'Thầy ơi, tạo đề thi cho em với' };
+        setMessages(prev => [...prev, syntheticUser]);
+        addAssistant(`Em muốn luyện đề loại nào?\n\nA. Đọc hiểu (30 phút)\nB. Phần Viết (90 phút)\nC. Đề tổng hợp Đọc hiểu + Viết (120 phút)`);
+    }, [addAssistant]);
+
+    const handleExamTypeChoice = useCallback(async (choice: string) => {
+        setAwaitingExamTypeChoice(false);
+        let prompt: string;
+        let label: string;
+        if (choice === 'b') { prompt = AI_EXAM_PROMPT_WRITING; label = 'Đề viết'; }
+        else if (choice === 'c') { prompt = AI_EXAM_PROMPT_FULL; label = 'Đề tổng hợp'; }
+        else { prompt = AI_EXAM_PROMPT_READING; label = 'Đề đọc hiểu'; }
+
+        addAssistant(`Thầy đang tạo ${label} chuẩn THPT 2025 cho em, chờ xíu...`, false);
+        setIsLoading(true);
+        const exam = await generateAIExam(prompt);
+        setIsLoading(false);
+        if (!exam) {
+            addAssistant('Lỗi tạo đề thi, em thử lại sau nhé.');
+            return;
+        }
+        const durationLabel = exam.durationMinutes === 30 ? '30 phút' : exam.durationMinutes === 90 ? '90 phút' : '120 phút';
+        const msg = `Đề đã sẵn sàng! Thời gian làm bài: ${durationLabel}. Nhấn "Làm bài" để bắt đầu em nhé.`;
+        setMessages(p => {
+            const next = [
+                ...p,
+                { role: 'assistant' as const, content: msg, aiExam: exam },
+            ];
+            resetProactiveTimer(next);
+            return next;
+        });
+        playNotification();
+        autoSpeak(msg);
+    }, [addAssistant, autoSpeak, resetProactiveTimer, playNotification]);
+
     const startGraphicFlow = () => {
         // Giả lập như user vừa nói "Em muốn tạo ảnh đồ họa ạ"
         const syntheticUser: Message = { role: 'user', content: 'Em muốn tạo ảnh đồ hoạ ạ' };
@@ -546,7 +634,8 @@ Phong cách: màu sắc ấm, chữ dễ đọc, phù hợp học sinh ôn thi t
         dailyQuote: DAILY_QUOTE,
         chatEndRef, fileInputRef,
         setInput, setPreviewImage,
-        handleSend, handleMagicRewrite, handlePlayTTS, startDiagnosis, handleFileSelect, startGraphicFlow,
+        handleSend, handleMagicRewrite, handlePlayTTS, startDiagnosis, handleFileSelect,
+        startGraphicFlow, startExamFlow, handleExamTypeChoice,
         addGradeMsg: (grade: ExamGrade, resolvedWeaknesses?: string[]) => {
             const scoreOutOf10 = +(grade.score / grade.maxScore * 10).toFixed(1);
             const label = scoreOutOf10 >= 8 ? 'Xuất sắc' : scoreOutOf10 >= 6.5 ? 'Khá' : scoreOutOf10 >= 5 ? 'Trung bình' : 'Cần cố gắng';

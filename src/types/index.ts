@@ -3,6 +3,27 @@ export interface Message {
   content: string;
   image?: string | null;
   generatedImage?: string | null;
+  /** Attached AI-generated exam — rendered as a special card with a "Làm bài" button */
+  aiExam?: AIExamData | null;
+  /** Inline practice question generated after concept explanation */
+  practiceQuestion?: string | null;
+}
+
+export interface AIExamQuestion {
+  id: number;
+  part: 'reading' | 'nlxh' | 'nlvh';
+  points: number;
+  prompt: string;
+  hint?: string;
+}
+
+export interface AIExamData {
+  type: 'reading' | 'writing' | 'full';
+  title: string;
+  durationMinutes: number;
+  passage?: string | null;
+  source?: string | null;
+  questions: AIExamQuestion[];
 }
 
 // Legacy compatibility alias

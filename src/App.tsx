@@ -10,8 +10,7 @@ import Sidebar from './components/Sidebar';
 import ChatMessage from './components/chat/ChatMessage';
 import SettingsPanel from './components/settings/SettingsPanel';
 import ExamPage from './components/exam/ExamPage';
-// import HomeTab from './components/home/HomeTab';
-import type { ExamGrade } from './types';
+import type { ExamGrade, AIExamData } from './types';
 import './index.css';
 
 type Tab = 'chat' | 'exam' | 'stats' | 'roadmap';
@@ -22,6 +21,7 @@ function AppContent() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isDiagnosing, setIsDiagnosing] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [activeAIExam, setActiveAIExam] = useState<AIExamData | null>(null);
 
   const onStartDiagnosticExam = useCallback(() => {
     setIsDiagnosing(true);
@@ -31,8 +31,14 @@ function AppContent() {
   const {
     messages, input, setInput, isLoading,
     previewImage, setPreviewImage, chatEndRef, fileInputRef,
-    handleSend, addGradeMsg, startGraphicFlow,
+    handleSend, addGradeMsg, startGraphicFlow, startExamFlow,
   } = useChat(onStartDiagnosticExam);
+
+  // ── Start AI Exam from chat card ──────────────────────────────────────
+  const handleStartAIExam = useCallback((exam: AIExamData) => {
+    setActiveAIExam(exam);
+    setActiveTab('exam');
+  }, []);
 
   // ── Exam grade callback: switch to chat and post result in chat ─────────
   const handleGradeComplete = useCallback((grade: ExamGrade, resolvedWeaknesses?: string[]) => {
@@ -115,6 +121,7 @@ function AppContent() {
                     key={i}
                     message={msg as Parameters<typeof ChatMessage>[0]['message']}
                     onPlayTTS={() => { }}
+                    onStartAIExam={handleStartAIExam}
                   />
                 ))}
                 {isLoading && (
@@ -128,18 +135,22 @@ function AppContent() {
               </div>
 
               <div className="input-bar">
-  {/* Quick action pills */}
-  <div className="quick-actions">
-    {['Đồ hoạ', 'Dẫn chứng', 'Quiz', 'Đề thi'].map(label => (
-      <button
-        key={label}
-        className="qa-btn"
-        onClick={label === 'Đồ hoạ' ? startGraphicFlow : undefined}
-      >
-        {label}
-      </button>
-    ))}
-  </div>
+                {/* Quick action pills */}
+                <div className="quick-actions">
+                  {['Đồ hoạ', 'Dẫn chứng', 'Quiz', 'Đề thi'].map(label => (
+                    <button
+                      key={label}
+                      className="qa-btn"
+                      onClick={
+                        label === 'Đồ hoạ' ? startGraphicFlow
+                          : label === 'Đề thi' ? startExamFlow
+                            : undefined
+                      }
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
 
                 {/* Camera preview */}
                 {previewImage && (
@@ -208,7 +219,11 @@ function AppContent() {
             <ExamPage
               diagnosticMode={isDiagnosing}
               onDiagnosticDone={() => { setIsDiagnosing(false); setActiveTab('chat'); }}
-              onGradeComplete={handleGradeComplete}
+              onGradeComplete={(grade, resolved) => {
+                setActiveAIExam(null);
+                handleGradeComplete(grade, resolved);
+              }}
+              aiExam={activeAIExam ?? undefined}
             />
           )}
 
