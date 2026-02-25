@@ -17,6 +17,9 @@ import {
     updateDoc,
     collection,
     addDoc,
+    getDocs,
+    query,
+    orderBy,
     serverTimestamp,
 } from 'firebase/firestore';
 import type { UserProfile, ExamSubmission, ExamGrade } from '../types';
@@ -273,4 +276,29 @@ export async function updateSubmissionGrade(uid: string, submissionId: string, g
         grade,
         gradedAt: serverTimestamp(),
     });
+}
+
+/**
+ * Get exam completion history for a user.
+ * Returns a Map of examId -> best score out of 10.
+ */
+export async function getExamHistory(uid: string): Promise<Map<number, number>> {
+    const map = new Map<number, number>();
+    try {
+        const q = query(collection(db, 'users', uid, 'submissions'), orderBy('createdAt', 'desc'));
+        const snap = await getDocs(q);
+        snap.forEach(d => {
+            const data = d.data() as { examId?: number; grade?: { score: number; maxScore: number } };
+            if (!data.examId || !data.grade) return;
+            const scoreOutOf10 = +(data.grade.score / data.grade.maxScore * 10).toFixed(1);
+            // Keep best score per examId
+            const existing = map.get(data.examId);
+            if (existing === undefined || scoreOutOf10 > existing) {
+                map.set(data.examId, scoreOutOf10);
+            }
+        });
+    } catch (e) {
+        console.error('getExamHistory error:', e);
+    }
+    return map;
 }

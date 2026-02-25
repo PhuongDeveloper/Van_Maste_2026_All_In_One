@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Loader2, Send, RefreshCw, CheckCircle, AlertCircle, Mic, MicOff, Square, Play, Maximize2, Clock, Trophy } from 'lucide-react';
 import { renderAsync } from 'docx-preview';
-import { pickRandomExam, fetchDocxAsText, gradeWithAI } from '../../services/examService';
-import { saveExamSubmission, updateSubmissionGrade, completeAssessment, saveExamInsights } from '../../services/firebaseService';
+import { pickRandomExam, fetchDocxAsText, gradeWithAI, detectAvailableExams } from '../../services/examService';
+import { saveExamSubmission, updateSubmissionGrade, completeAssessment, saveExamInsights, getExamHistory } from '../../services/firebaseService';
 import { useAuth } from '../../context/AuthContext';
 import GradingResult from './GradingResult';
 import type { ExamSubmission, ExamGrade, AIExamData } from '../../types';
@@ -40,7 +40,7 @@ interface ExamPageProps {
 
 export default function ExamPage({ diagnosticMode = false, onDiagnosticDone, onGradeComplete, aiExam }: ExamPageProps) {
     const { user, userProfile, setUserProfile } = useAuth();
-    const [examId, setExamId] = useState<number>(() => pickRandomExam());
+    const [examId, setExamId] = useState<number | null>(aiExam ? 0 : null);
     const [status, setStatus] = useState<ExamStatus>('loading');
     const [answer, setAnswer] = useState('');
     const [gradeResult, setGradeResult] = useState<ExamSubmission['grade'] | null>(null);
@@ -50,6 +50,10 @@ export default function ExamPage({ diagnosticMode = false, onDiagnosticDone, onG
     const [voiceSupported] = useState(() => Boolean(SpeechRecognitionAPI));
     const [isCheating, setIsCheating] = useState(false);
     const [interimAnswer, setInterimAnswer] = useState('');
+    /** Real count of available .docx exams (probed on mount) */
+    const [availableCount, setAvailableCount] = useState(0);
+    /** Map of examId -> best score out of 10 for this user */
+    const [examHistory, setExamHistory] = useState<Map<number, number>>(new Map());
 
     // ── Timer ──────────────────────────────────────────────────────────────────
     const [timeLeft, setTimeLeft] = useState(() => aiExam ? aiExam.durationMinutes * 60 : EXAM_DURATION_SECONDS);
@@ -68,6 +72,7 @@ export default function ExamPage({ diagnosticMode = false, onDiagnosticDone, onG
     };
 
     const loadExam = useCallback(async (id: number) => {
+        if (aiExam || !id) return;
         setStatus('loading');
         setAnswer('');
         setGradeResult(null);
@@ -98,18 +103,30 @@ export default function ExamPage({ diagnosticMode = false, onDiagnosticDone, onG
             setErrorMsg('Không thể tải đề thi. Đặt file vào thư mục public/dethi/');
             setStatus('error');
         }
-    }, []);
+    }, [aiExam]);
 
     useEffect(() => {
         if (aiExam) {
             // AI-generated exam: skip DOCX loading, go directly to ready state
             setStatus('ready');
             setTimeLeft(aiExam.durationMinutes * 60);
-        } else {
+        } else if (examId) {
             loadExam(examId);
         }
     }, [examId, aiExam, loadExam]);
     useEffect(() => () => { recognitionRef.current?.abort(); }, []);
+
+    // ── Probe available exams + load history on mount ────────────────────────
+    useEffect(() => {
+        if (aiExam) return; // not needed for AI exams
+        detectAvailableExams().then(count => {
+            setAvailableCount(count);
+            setExamId(prev => prev || pickRandomExam(count));
+        });
+        if (user) {
+            getExamHistory(user.uid).then(setExamHistory);
+        }
+    }, [user, aiExam]);
 
     // ── Timer logic ────────────────────────────────────────────────────────────
     const startTimer = useCallback(() => {
@@ -227,12 +244,13 @@ export default function ExamPage({ diagnosticMode = false, onDiagnosticDone, onG
         stopTimer();
         if (document.fullscreenElement) document.exitFullscreen().catch(() => { });
         if (isRecording) { recognitionRef.current?.stop(); setIsRecording(false); }
-        setExamId(pickRandomExam());
+        const count = availableCount || 1;
+        setExamId(pickRandomExam(count));
     };
 
     // ── Submit ─────────────────────────────────────────────────────────────────
     const handleSubmit = async (cheating = false) => {
-        if (!user) return;
+        if (!user || examId == null) return;
         stopTimer();
         if (document.fullscreenElement) document.exitFullscreen().catch(() => { });
         if (isRecording) { recognitionRef.current?.stop(); setIsRecording(false); }
@@ -278,6 +296,17 @@ export default function ExamPage({ diagnosticMode = false, onDiagnosticDone, onG
             setStatus('graded');
             setShowGrading(true);
 
+            // Update local examHistory (best score per exam)
+            const scoreOutOf10 = +(grade.score / grade.maxScore * 10).toFixed(1);
+            setExamHistory(prev => {
+                const next = new Map(prev);
+                const existing = next.get(examId);
+                if (existing === undefined || scoreOutOf10 > existing) {
+                    next.set(examId, scoreOutOf10);
+                }
+                return next;
+            });
+
             // Switch to chat and show grade result (with resolved weaknesses list)
             onGradeComplete?.(grade, resolvedWeaknesses);
         } catch (err) {
@@ -291,6 +320,7 @@ export default function ExamPage({ diagnosticMode = false, onDiagnosticDone, onG
     const timerColor = timeLeft < 300 ? 'text-red-500 animate-pulse' : timeLeft < 600 ? 'text-amber-500' : 'text-slate-700';
     const isActive = status === 'active';
     const isReadyOrActive = status === 'ready' || status === 'active';
+    const bestScore = examId != null ? examHistory.get(examId) : undefined;
 
     return (
         <div ref={examWrapperRef} className="flex flex-col h-full bg-[#f8f9fa]">
@@ -313,6 +343,12 @@ export default function ExamPage({ diagnosticMode = false, onDiagnosticDone, onG
                         <div className={`flex items-center gap-1 font-mono font-black text-sm px-3 py-1.5 rounded-xl bg-slate-100 ${timerColor}`}>
                             <Clock size={13} /> {fmtTime(timeLeft)}
                         </div>
+                    )}
+                    {/* Exam history badge */}
+                    {bestScore != null && (
+                        <span className="text-[10px] font-semibold bg-blue-50 text-blue-700 px-2 py-1 rounded-full border border-blue-200">
+                            Đã làm: {bestScore}/10
+                        </span>
                     )}
                     {status === 'ready' && (
                         <span className="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-1 rounded-full flex items-center gap-1">

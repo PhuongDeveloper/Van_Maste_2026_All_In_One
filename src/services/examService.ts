@@ -3,9 +3,35 @@ import { EXAM_COUNT } from '../constants';
 import { sendGradingRequest } from './geminiApi';
 import type { ExamGrade } from '../types';
 
-/** Pick a random exam ID from 1..EXAM_COUNT */
-export function pickRandomExam(): number {
-    return Math.floor(Math.random() * EXAM_COUNT) + 1;
+/** Pick a random exam ID from 1..count (default EXAM_COUNT if not provided) */
+export function pickRandomExam(count = EXAM_COUNT): number {
+    const safeCount = Math.max(1, count);
+    return Math.floor(Math.random() * safeCount) + 1;
+}
+
+/** Cache so we only probe once per page session */
+let _availableExamsCache: number | null = null;
+
+/**
+ * Probe HEAD requests for /dethi/1.docx ... /dethi/N.docx
+ * and return the actual number of available exams.
+ * Results are cached for the session.
+ */
+export async function detectAvailableExams(): Promise<number> {
+    if (_availableExamsCache !== null) return _availableExamsCache;
+    let count = 0;
+    // Try up to EXAM_COUNT + 10 to be safe
+    for (let i = 1; i <= EXAM_COUNT + 10; i++) {
+        try {
+            const res = await fetch(`/dethi/${i}.docx`, { method: 'HEAD' });
+            if (!res.ok) break;
+            count = i;
+        } catch {
+            break;
+        }
+    }
+    _availableExamsCache = Math.max(1, count);
+    return _availableExamsCache;
 }
 
 /** Fetch a .docx from public folder and extract text using mammoth */
