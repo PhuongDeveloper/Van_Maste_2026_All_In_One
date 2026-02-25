@@ -1,121 +1,219 @@
-import { useState } from 'react';
-
-// Components
-import GlobalStyles from './components/GlobalStyles';
-import SplashScreen from './components/SplashScreen';
-import Header from './components/Header';
-import TabNav, { type TabType } from './components/TabNav';
-import ChatMessage from './components/chat/ChatMessage';
-import ChatInput from './components/chat/ChatInput';
-import QuickActions from './components/chat/QuickActions';
-import HomeTab from './components/home/HomeTab';
-import StatsTab from './components/stats/StatsTab';
-
-// Hooks
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { Send, Mic, MicOff, Camera, Loader2, X } from 'lucide-react';
+import { useAuth } from './context/AuthContext';
 import { useChat } from './hooks/useChat';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
+import SplashScreen from './components/SplashScreen';
+import Header from './components/Header';
+import TabNav from './components/TabNav';
+import Sidebar from './components/Sidebar';
+import ChatMessage from './components/chat/ChatMessage';
+import SettingsPanel from './components/settings/SettingsPanel';
+import ExamPage from './components/exam/ExamPage';
+import HomeTab from './components/home/HomeTab';
+import type { ExamGrade } from './types';
+import './index.css';
 
-// Icons
-import { Loader2 } from 'lucide-react';
+type Tab = 'chat' | 'home' | 'exam' | 'stats';
 
-export default function App() {
-  const [activeTab, setActiveTab] = useState<TabType>('chat');
-  const [hasStarted, setHasStarted] = useState(false);
+function AppContent() {
+  const { user, userProfile, loading } = useAuth();
+  const [activeTab, setActiveTab] = useState<Tab>('chat');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [isDiagnosing, setIsDiagnosing] = useState(false);
+
+  const onStartDiagnosticExam = useCallback(() => {
+    setIsDiagnosing(true);
+    setActiveTab('exam');
+  }, []);
 
   const {
-    messages,
-    input,
-    isLoading,
-    isRewriting,
-    isDiagnosing,
-    autoPlayAudio,
-    userData,
-    dailyQuote,
-    chatEndRef,
-    fileInputRef,
-    setInput,
-    setAutoPlayAudio,
-    handleSend,
-    handleMagicRewrite,
-    handlePlayTTS,
-    startDiagnosis,
-    handleFileSelect,
-  } = useChat();
+    messages, input, setInput, isLoading,
+    previewImage, setPreviewImage, chatEndRef, fileInputRef,
+    handleSend, addGradeMsg, startGraphicFlow,
+  } = useChat(onStartDiagnosticExam);
 
-  const { isRecording, toggleRecording } = useSpeechRecognition((transcript) => {
-    setInput(transcript);
-  });
+  // ── Exam grade callback: switch to chat and post result in chat ─────────
+  const handleGradeComplete = useCallback((grade: ExamGrade, resolvedWeaknesses?: string[]) => {
+    setIsDiagnosing(false);
+    setActiveTab('chat');
+    addGradeMsg(grade, resolvedWeaknesses);
+  }, [addGradeMsg]);
 
-  // --- Splash Screen ---
-  if (!hasStarted) {
-    return <SplashScreen dailyQuote={dailyQuote} onStart={() => setHasStarted(true)} />;
+  // ── Speech Recognition ───────────────────────────────────────────────────
+  const committedRef = useRef('');
+  const { isRecording, toggleRecording } = useSpeechRecognition(
+    (final) => {
+      committedRef.current += ' ' + final;
+      setInput(committedRef.current.trim());
+    },
+    (interim) => {
+      setInput((committedRef.current + ' ' + interim).trim());
+    }
+  );
+  useEffect(() => {
+    if (!isRecording) committedRef.current = '';
+  }, [isRecording]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      committedRef.current = '';
+      handleSend();
+    }
+  };
+
+  const handleCameraCapture = () => fileInputRef.current?.click();
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100dvh', background: '#F8FAFC' }}>
+        <div className="loading-dots"><span /><span /><span /></div>
+      </div>
+    );
   }
 
-  // --- Main App ---
+  if (!user) return <SplashScreen />;
+
   return (
-    <div className="flex flex-col h-screen bg-[#F0F9FF] text-slate-900 w-full max-w-screen-2xl mx-auto">
-      <GlobalStyles />
+    <div className="app-shell">
+      <Header onOpenSettings={() => setSettingsOpen(true)} />
 
-      <Header
-        userData={userData}
-        autoPlayAudio={autoPlayAudio}
-        onToggleAudio={() => setAutoPlayAudio(!autoPlayAudio)}
-      />
+      <div className="app-body">
+        {/* Left Sidebar — desktop only */}
+        {userProfile && <Sidebar profile={userProfile} />}
 
-      <TabNav activeTab={activeTab} onTabChange={setActiveTab} />
+        {/* Main Area */}
+        <div className="main-area">
+          <TabNav active={activeTab} onChange={setActiveTab} />
 
-      <main className="flex-1 overflow-hidden relative mt-2">
-        {/* Chat Tab */}
-        {activeTab === 'chat' && (
-          <div className="flex flex-col h-full">
-            <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-48 no-scrollbar">
-              {messages.map((msg, i) => (
-                <ChatMessage key={i} message={msg} onPlayTTS={handlePlayTTS} />
-              ))}
-              {isLoading && (
-                <div className="flex justify-start">
-                  <div className="bg-white p-4 rounded-3xl flex gap-2 items-center shadow-sm">
-                    <Loader2 className="animate-spin text-[#0EA5E9]" />
-                    <span className="text-xs font-bold text-slate-400">Master đang soạn bài...</span>
+          {/* Chat Tab */}
+          {activeTab === 'chat' && (
+            <>
+              <div className="chat-scroll">
+                {messages.map((msg, i) => (
+                  <ChatMessage
+                    key={i}
+                    message={msg as Parameters<typeof ChatMessage>[0]['message']}
+                    onPlayTTS={() => { }}
+                  />
+                ))}
+                {isLoading && (
+                  <div className="msg-row assistant slide-up">
+                    <div className="msg-avatar">VM</div>
+                    <div className="loading-dots"><span /><span /><span /></div>
                   </div>
+                )}
+                {/* Sentinel div for smooth auto-scroll to latest message */}
+                <div ref={chatEndRef as React.RefObject<HTMLDivElement>} />
+              </div>
+
+              <div className="input-bar">
+  {/* Quick action pills */}
+  <div className="quick-actions">
+    {['Đồ hoạ', 'Dẫn chứng', 'Quiz', 'Đề thi'].map(label => (
+      <button
+        key={label}
+        className="qa-btn"
+        onClick={label === 'Đồ hoạ' ? startGraphicFlow : undefined}
+      >
+        {label}
+      </button>
+    ))}
+  </div>
+
+                {/* Camera preview */}
+                {previewImage && (
+                  <div style={{ position: 'relative', width: 80 }}>
+                    <img src={previewImage} style={{ width: 80, height: 60, objectFit: 'cover', borderRadius: 10 }} alt="" />
+                    <button onClick={() => setPreviewImage(null)} style={{ position: 'absolute', top: -6, right: -6, background: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', width: 20, height: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <X size={11} />
+                    </button>
+                  </div>
+                )}
+
+                <div className="input-row">
+                  <button className={`icon-btn ${isRecording ? 'active' : ''}`} onClick={toggleRecording} title="Ghi âm">
+                    {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
+                  </button>
+
+                  <textarea
+                    className="chat-input"
+                    rows={1}
+                    placeholder={isRecording ? 'Đang nghe...' : 'Hỏi gì cũng được...'}
+                    value={input}
+                    onChange={e => { setInput(e.target.value); committedRef.current = e.target.value; }}
+                    onKeyDown={handleKeyDown}
+                  />
+
+                  <button className="icon-btn" onClick={handleCameraCapture} title="Ảnh">
+                    <Camera size={18} />
+                  </button>
+                  <button
+                    className="icon-btn send"
+                    onClick={() => { committedRef.current = ''; handleSend(); }}
+                    disabled={isLoading || (!input.trim() && !previewImage)}
+                  >
+                    {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                  </button>
                 </div>
-              )}
-              <div ref={chatEndRef} />
-            </div>
+              </div>
 
-            <div className="absolute bottom-4 left-4 right-4 z-20">
-              <QuickActions onSend={handleSend} />
-              <ChatInput
-                input={input}
-                isRecording={isRecording}
-                isRewriting={isRewriting}
-                fileInputRef={fileInputRef}
-                onInputChange={setInput}
-                onSend={() => handleSend()}
-                onToggleRecording={toggleRecording}
-                onMagicRewrite={handleMagicRewrite}
-                onFileSelect={handleFileSelect}
-                onCameraClick={() => fileInputRef.current?.click()}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = ev => setPreviewImage(ev.target?.result as string);
+                  reader.readAsDataURL(file);
+                  e.target.value = '';
+                }}
               />
-            </div>
-          </div>
-        )}
+            </>
+          )}
 
-        {/* Home Tab */}
-        {activeTab === 'home' && (
-          <HomeTab
-            userData={userData}
-            isDiagnosing={isDiagnosing}
-            onStartDiagnosis={() => {
-              startDiagnosis();
-              setActiveTab('chat');
+          {/* Home Tab */}
+          {activeTab === 'home' && <HomeTab
+            userData={{
+              level: userProfile?.level || 'Tân Binh',
+              status: 'Sẵn sàng chiến',
+              progress: userProfile?.progress || 5,
+              xp: userProfile?.xp || 0,
+              streak: userProfile?.streak || 1,
+              daysLeft: 0,
             }}
-          />
-        )}
+            isDiagnosing={isDiagnosing}
+            onStartDiagnosis={() => { setIsDiagnosing(true); setActiveTab('exam'); }}
+          />}
 
-        {/* Stats Tab */}
-        {activeTab === 'stats' && <StatsTab />}
-      </main>
+          {/* Exam Tab */}
+          {activeTab === 'exam' && (
+            <ExamPage
+              diagnosticMode={isDiagnosing}
+              onDiagnosticDone={() => { setIsDiagnosing(false); setActiveTab('chat'); }}
+              onGradeComplete={handleGradeComplete}
+            />
+          )}
+
+          {/* Stats Tab */}
+          {activeTab === 'stats' && (
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: 14 }}>
+              Tính năng đang được phát triển...
+            </div>
+          )}
+        </div>
+      </div>
+
+      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
+}
+
+export default function App() {
+  return <AppContent />;
 }

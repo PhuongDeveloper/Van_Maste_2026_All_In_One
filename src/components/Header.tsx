@@ -1,39 +1,57 @@
-import React from 'react';
-import { Activity, Volume2, VolumeX } from 'lucide-react';
-import type { UserData } from '../types';
+import { Settings, Bell } from 'lucide-react';
+import { EXAM_DATE } from '../constants';
+import { useAuth } from '../context/AuthContext';
 
 interface HeaderProps {
-    userData: UserData;
-    autoPlayAudio: boolean;
-    onToggleAudio: () => void;
+    onOpenSettings: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ userData, autoPlayAudio, onToggleAudio }) => (
-    <header className="bg-white/80 backdrop-blur-xl p-4 sticky top-0 z-50 flex justify-between items-center shadow-sm border-b border-slate-200">
-        <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-tr from-[#0EA5E9] to-[#38BDF8] rounded-2xl flex items-center justify-center text-white shadow-lg">
-                <Activity size={24} />
-            </div>
-            <div>
-                <h2 className="text-lg font-black uppercase text-slate-800 leading-none">Văn Master</h2>
-                <div className="flex gap-2 mt-1">
-                    <span className="text-[10px] font-bold bg-[#0EA5E9] text-white px-2 py-0.5 rounded-md">
-                        {userData.level}
-                    </span>
-                    <span className="text-[10px] font-bold text-slate-500">{userData.xp} XP</span>
-                </div>
-            </div>
-        </div>
-        <button
-            onClick={onToggleAudio}
-            className={`p-3 rounded-2xl border-2 transition-all ${autoPlayAudio
-                    ? 'border-[#0EA5E9] text-[#0EA5E9] bg-[#E0F2FE]'
-                    : 'border-slate-200 text-slate-400'
-                }`}
-        >
-            {autoPlayAudio ? <Volume2 size={20} /> : <VolumeX size={20} />}
-        </button>
-    </header>
-);
+function daysLeft() {
+    return Math.max(0, Math.ceil(
+        (new Date(EXAM_DATE).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+    ));
+}
 
-export default Header;
+export default function Header({ onOpenSettings }: HeaderProps) {
+    const { userProfile } = useAuth();
+    const diff = daysLeft();
+    const pct = Math.min(100, Math.round(100 - (diff / 365) * 100));
+
+    const initial = userProfile?.name?.charAt(0)?.toUpperCase() || 'U';
+
+    return (
+        <header className="app-header">
+            {/* Logo */}
+            <div className="app-header-logo">
+                <span className="logo-text">Văn<em>Master</em></span>
+                <span className="logo-year">2026</span>
+            </div>
+
+            {/* Countdown chip */}
+            <div className="countdown-chip">
+                <div className="countdown-bar-wrap">
+                    <div className="countdown-bar" style={{ width: `${pct}%` }} />
+                </div>
+                <span>Còn <strong>{diff}</strong> ngày</span>
+            </div>
+
+            <div style={{ flex: 1 }} />
+
+            {/* Notification (future feature placeholder) */}
+            <button className="hdr-icon-btn" title="Thông báo" style={{ position: 'relative' }}>
+                <Bell size={17} />
+                <span className="notif-dot" />
+            </button>
+
+            {/* Settings */}
+            <button className="hdr-icon-btn" onClick={onOpenSettings} title="Cài đặt">
+                <Settings size={17} />
+            </button>
+
+            {/* User avatar */}
+            <button className="hdr-avatar" onClick={onOpenSettings} title="Hồ sơ của bạn">
+                {initial}
+            </button>
+        </header>
+    );
+}

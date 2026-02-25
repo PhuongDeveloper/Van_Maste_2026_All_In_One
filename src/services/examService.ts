@@ -1,0 +1,141 @@
+import mammoth from 'mammoth';
+import { EXAM_COUNT } from '../constants';
+import { sendGradingRequest } from './geminiApi';
+import type { ExamGrade } from '../types';
+
+/** Pick a random exam ID from 1..EXAM_COUNT */
+export function pickRandomExam(): number {
+    return Math.floor(Math.random() * EXAM_COUNT) + 1;
+}
+
+/** Fetch a .docx from public folder and extract text using mammoth */
+export async function fetchDocxAsText(url: string): Promise<string> {
+    const res = await fetch(url);
+    const arrayBuffer = await res.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    return result.value;
+}
+
+/**
+ * Deep AI grading — strict THPT Quoc Gia standard.
+ * Grades each criterion from the official answer key.
+ */
+export async function gradeWithAI(
+    examText: string,
+    answerKeyText: string,
+    studentAnswer: string,
+): Promise<ExamGrade> {
+    // Count words to enforce word-limit requirements
+    const wordCount = studentAnswer.trim().split(/\s+/).filter(Boolean).length;
+
+    const prompt = `Bạn là giám khảo chấm thi THPT Quốc Gia môn Ngữ Văn. Nhiệm vụ: chấm điểm CHÍNH XÁC và NGHIÊM KHẮC theo đúng hướng dẫn chấm chính thức — KHÔNG hào phóng, KHÔNG suy đoán có ý khi bài làm không thể hiện rõ.
+
+══════════════════════════════════════════
+NGUYÊN TẮC CHẤM BẮT BUỘC (vi phạm = chấm sai):
+
+① CHỈ cho điểm khi học sinh ĐÃ VIẾT ĐỦ Ý theo hướng dẫn chấm.
+   - Thiếu ý → trừ điểm phần đó, KHÔNG cho điểm toàn phần
+   - Suy đoán "có ý ngầm" là SAI nguyên tắc
+
+② YÊU CẦU ĐỘ DÀI: Nếu đề ghi "khoảng X chữ":
+   - Bài viết < 75% số chữ yêu cầu: trừ 0.25–0.5đ phần đó (chưa triển khai đủ)
+   - Ví dụ: yêu cầu ~200 chữ, viết 140 chữ = chỉ đạt 70% → PHẢI trừ điểm
+   (Bài làm này có ${wordCount} chữ — so sánh với yêu cầu trong từng câu)
+
+③ CÂU ĐỌC HIỂU: Chỉ cho điểm tối đa khi trả lời đúng VÀ đủ ý theo đáp án.
+   - Trả lời đúng nhưng thiếu ý → cho một nửa điểm câu đó
+   - Trả lời sai/thiếu ý chính → 0 điểm câu đó
+
+④ CÂU NGHỊ LUẬN XÃ HỘI: Kiểm tra đủ 4 tiêu chí:
+   (a) Có đủ bố cục mở/thân/kết rõ ràng
+   (b) Luận điểm rõ ràng, đúng hướng yêu cầu
+   (c) Có dẫn chứng cụ thể (người thật, sự kiện thật)
+   (d) Đủ số chữ yêu cầu (xem ②)
+   Thiếu tiêu chí nào → trừ điểm tương ứng
+
+⑤ CÂU NGHỊ LUẬN VĂN HỌC: Kiểm tra:
+   (a) Phân tích đúng tác phẩm/đoạn trích theo hướng dẫn
+   (b) Có dẫn chứng trực tiếp từ văn bản (trích thơ/văn)
+   (c) Đủ các luận điểm chính mà hướng dẫn chấm yêu cầu
+   Thiếu luận điểm nào trong hướng dẫn → trừ điểm phần đó
+
+⑥ GIỚI HẠN ĐIỂM CAO:
+   - ≥ 2 lỗi nghiêm trọng (thiếu ý chính / thiếu dẫn chứng / không đủ chữ): điểm ≤ 7.5
+   - ≥ 1 lỗi nghiêm trọng: điểm ≤ 8.75
+   - Chỉ cho điểm 9.0–10.0 khi bài gần như hoàn hảo, không có lỗi đáng kể
+
+══════════════════════════════════════════
+ĐỀ THI:
+${examText}
+
+══════════════════════════════════════════
+HƯỚNG DẪN CHẤM CHÍNH THỨC
+(Căn cứ DUY NHẤT để chấm — đối chiếu TỪNG TIÊU CHÍ với bài làm):
+${answerKeyText}
+
+══════════════════════════════════════════
+BÀI LÀM CỦA HỌC SINH (${wordCount} chữ):
+${studentAnswer}
+
+══════════════════════════════════════════
+QUY TRÌNH CHẤM — thực hiện tuần tự TRƯỚC khi xuất JSON:
+
+BƯỚC 1: Liệt kê từng câu trong hướng dẫn chấm và thang điểm tương ứng
+BƯỚC 2: Với mỗi câu, đọc tiêu chí → kiểm tra bài làm có đáp ứng không → ghi điểm thực tế
+BƯỚC 3: Kiểm tra yêu cầu độ dài từng phần (nếu có)
+BƯỚC 4: Áp dụng giới hạn điểm (nguyên tắc ⑥) nếu có lỗi nghiêm trọng
+BƯỚC 5: Tính tổng điểm
+
+══════════════════════════════════════════
+ĐẦU RA — Trả về JSON THUẦN (không markdown, không \`\`\`):
+{
+  "score": <điểm thực tế, tính đến 0.25>,
+  "maxScore": <tổng điểm tối đa>,
+  "feedback": "<nhận xét thẳng thắn: nêu cụ thể thiếu sót, không khen chung chung>",
+  "details": "<chấm chi tiết từng câu: Câu X (Y/Z điểm): lý do được/bị trừ điểm>",
+  "errors": [
+    {
+      "quote": "<trích đoạn hoặc mô tả lỗi cụ thể>",
+      "issue": "<Thiếu ý / Không đủ chữ (X/Y chữ) / Sai đáp án / Thiếu dẫn chứng / Lập luận yếu / Thiếu phân tích>",
+      "suggestion": "<hướng dẫn sửa cụ thể>"
+    }
+  ],
+  "improvements": ["<gợi ý cụ thể tăng điểm, tối đa 3 mục>"],
+  "weaknesses": ["<tag ≤4 từ, tối đa 4 tag>"],
+  "strengths": ["<tag ≤4 từ, chỉ khi có thực, tối đa 4 tag>"]
+}
+
+RÀNG BUỘC BẮT BUỘC:
+- Bài trống: {"score":0,"maxScore":10,"feedback":"Học sinh không nộp bài làm.","details":"Bài trống — 0/10 điểm.","errors":[],"improvements":["Cần viết bài đầy đủ"],"weaknesses":["không viết bài"],"strengths":[]}
+- errors[] phải liệt kê TẤT CẢ lỗi quan trọng (thiếu ý, không đủ chữ, sai đáp án, thiếu dẫn chứng)
+- Nếu bài thiếu ý/thiếu chữ nhưng AI vẫn cho điểm cao → vi phạm nguyên tắc chấm`;
+
+    const rawText = await sendGradingRequest(prompt);
+
+    try {
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]) as ExamGrade;
+            // Ensure arrays exist
+            parsed.errors = parsed.errors || [];
+            parsed.improvements = parsed.improvements || [];
+            parsed.weaknesses = parsed.weaknesses || [];
+            parsed.strengths = parsed.strengths || [];
+            return parsed;
+        }
+    } catch (e) {
+        console.error('Failed to parse grading JSON:', e);
+    }
+
+    // Fallback
+    return {
+        score: 0,
+        maxScore: 10,
+        feedback: rawText,
+        details: 'Không thể phân tích kết quả chi tiết.',
+        errors: [],
+        improvements: [],
+        weaknesses: ['lỗi phân tích'],
+        strengths: [],
+    };
+}

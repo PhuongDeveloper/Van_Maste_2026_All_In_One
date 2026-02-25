@@ -1,35 +1,35 @@
 import React from 'react';
-import { MessageSquare, Target, BarChart3 } from 'lucide-react';
+import { BookOpen, FileText, Trophy } from 'lucide-react';
 
-export type TabType = 'chat' | 'home' | 'stats';
+type Tab = 'chat' | 'home' | 'exam' | 'stats';
 
 interface TabNavProps {
-    activeTab: TabType;
-    onTabChange: (tab: TabType) => void;
+    active: Tab;
+    onChange: (t: Tab) => void;
 }
 
-const TAB_CONFIG: { key: TabType; icon: React.ReactNode; label: string }[] = [
-    { key: 'chat', icon: <MessageSquare size={16} />, label: 'Học Bài' },
-    { key: 'home', icon: <Target size={16} />, label: 'Lộ Trình' },
-    { key: 'stats', icon: <BarChart3 size={16} />, label: 'Kỷ Lục' },
+const TABS: { id: Tab; label: string; icon: React.ReactNode; emoji: string }[] = [
+    { id: 'chat', label: 'Học Bài', icon: <BookOpen size={15} />, emoji: '📚' },
+    { id: 'exam', label: 'Làm Bài', icon: <FileText size={15} />, emoji: '✍️' },
+    { id: 'stats', label: 'Kỷ Lục', icon: <Trophy size={15} />, emoji: '🏆' },
 ];
 
-const TabNav: React.FC<TabNavProps> = ({ activeTab, onTabChange }) => (
-    <nav className="flex p-2 gap-2 mx-4 mt-4 bg-white rounded-3xl shadow-sm border border-slate-100">
-        {TAB_CONFIG.map((t) => (
-            <button
-                key={t.key}
-                onClick={() => onTabChange(t.key)}
-                className={`flex-1 py-3 rounded-2xl text-xs font-bold uppercase transition-all flex justify-center gap-2 ${activeTab === t.key
-                        ? 'bg-[#0EA5E9] text-white shadow-lg'
-                        : 'text-slate-400 hover:bg-slate-50'
-                    }`}
-            >
-                {t.icon}
-                <span className="hidden sm:inline">{t.label}</span>
-            </button>
-        ))}
-    </nav>
-);
-
-export default TabNav;
+export default function TabNav({ active, onChange }: TabNavProps) {
+    return (
+        <nav className="tab-nav">
+            <div className="tab-track">
+                {TABS.map(t => (
+                    <button
+                        key={t.id}
+                        className={`tab-btn ${active === t.id ? 'active' : ''}`}
+                        onClick={() => onChange(t.id)}
+                    >
+                        <span className="tab-icon">{t.icon}</span>
+                        <span className="tab-label">{t.label}</span>
+                        {active === t.id && <span className="tab-indicator" />}
+                    </button>
+                ))}
+            </div>
+        </nav>
+    );
+}

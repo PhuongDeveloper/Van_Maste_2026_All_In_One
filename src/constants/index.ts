@@ -1,30 +1,81 @@
 import type { UserData } from '../types';
 
-export const SYSTEM_PROMPT = `Bạn là "Văn Master 2026", trợ lý học tập vui tính.
-QUY TẮC:
-1. ĐỒ HỌA: Dùng định dạng [TIMELINE] Thời gian | Sự kiện | Mô tả.
-2. ẢNH: Dùng [GEN_IMAGE] mô tả tiếng Anh.
-3. ĐỀ THI: Dùng [EXAM_PAPER] nội dung [/EXAM_PAPER].
-4. TRẮC NGHIỆM: A. B. C. D. rõ ràng.`;
+export const SYSTEM_PROMPT = `Bạn là "Văn Master 2026", gia sư Ngữ Văn.
+QUY TẮC BẮT BUỘC:
+1. Tối đa 80 từ mỗi câu trả lời — KHÔNG vượt quá.
+2. KHÔNG dùng emoji. KHÔNG dùng ký tự * hoặc ** để in đậm.
+3. Thẳng vào vấn đề, không dài dòng, không chào hỏi lại.
+4. ĐỒ HỌA (timeline, sơ đồ): dùng [TIMELINE] Thời gian | Sự kiện | Mô tả.
+5. TÓM TẮT TÁC PHẨM / THÔNG TIN NHANH: dùng [INFOGRAPHIC] tên_tác_phẩm [/INFOGRAPHIC]. Chỉ dùng khi user yêu cầu tóm tắt hoặc giới thiệu một tác phẩm.
+6. ĐỀ THI: dùng [EXAM_PAPER] nội dung [/EXAM_PAPER].
+7. TRẮC NGHIỆM: A. B. C. D. rõ ràng — trên từng dòng riêng.
+8. Dùng gạch đầu dòng "-" thay cho in đậm khi liệt kê.`;
+
+export const INFOGRAPHIC_TRIGGER = '[INFOGRAPHIC]';
+
+/** Prompt dùng khi AI chủ động hỏi sau inactivity */
+export const PROACTIVE_PROMPT = `Dựa vào lịch sử chat bên dưới, hãy đặt 1 câu hỏi ngắn (tối đa 25 từ) để gợi ý bước tiếp theo cho học sinh. KHÔNG chào hỏi, KHÔNG tóm tắt lại, chỉ hỏi thẳng câu gợi ý hành động cụ thể. Ví dụ: "Em có muốn thầy ra một đề tập viết về chủ đề này không?" hoặc "Em còn thắc mắc phần nào về đoạn vừa học không?".`;
+
+/** Prompt sinh đề trắc nghiệm chuẩn đoán 10 câu — trả về JSON thuần */
+export const QUIZ_GENERATION_PROMPT = `Bạn là gia sư Ngữ Văn. Hãy tạo một bài kiểm tra trắc nghiệm chuẩn đoán năng lực đọc hiểu Ngữ Văn lớp 12.
+
+YÊU CẦU:
+- Chọn 1 đoạn trích ngắn (150-250 chữ) từ một tác phẩm văn học Việt Nam có trong chương trình THPT (nêu rõ tên tác phẩm, tác giả).
+- Tạo đúng 10 câu hỏi trắc nghiệm từ dễ đến khó, đúng chuẩn đề đọc hiểu THPTQG (hỏi về: nội dung chính, từ ngữ, biện pháp tu từ, thể loại, chủ đề, thái độ tác giả...).
+- Mỗi câu có 4 đáp án A, B, C, D. Chỉ 1 đáp án đúng.
+
+ĐỊNH DẠNG — trả về JSON THUẦN, không có markdown, không có \`\`\`:
+{
+  "passage": "Nội dung đoạn trích...",
+  "source": "Trích từ [Tên tác phẩm] — [Tác giả]",
+  "questions": [
+    {
+      "q": "Nội dung câu hỏi?",
+      "a": "Đáp án A",
+      "b": "Đáp án B",
+      "c": "Đáp án C",
+      "d": "Đáp án D",
+      "correct": "a"
+    }
+  ]
+}`;
 
 export const DEFAULT_USER_DATA: UserData = {
-    level: 'Tân Binh',
-    status: 'Sẵn sàng chiến',
-    progress: 5,
-    xp: 0,
-    streak: 1,
-    daysLeft: 0,
+  level: 'Tân Binh',
+  status: 'Sẵn sàng chiến',
+  progress: 5,
+  xp: 0,
+  streak: 1,
+  daysLeft: 0,
 };
 
 export const EXAM_DATE = '2026-06-25';
 
-export const MAX_TTS_LENGTH = 500;
+export const MAX_TTS_LENGTH = 600;
 
-export const CHAT_HISTORY_LIMIT = 2;
+export const CHAT_HISTORY_LIMIT = 4;
 
 export const DAILY_QUOTE = 'Văn học là nhân học. Học văn là học làm người.';
 
-export const WELCOME_MESSAGE = "Yo! Master đây! Mình đã 'tân trang' giao diện cực cháy cho bạn rồi. Thử ngay: 'Tóm tắt bài Vợ Nhặt' để xem đồ họa mới nhé! 🔥";
+/** Số đề thi hiện có trong public/dethi/ (1.docx → N.docx) */
+export const EXAM_COUNT = 5;
+
+/** TTS voice names */
+export const TTS_VOICE_MAP = {
+  female: 'vi-VN-Wavenet-C',
+  male: 'vi-VN-Wavenet-D',
+} as const;
+
+/** Pronoun based on voice gender */
+export const PRONOUN_MAP = {
+  female: 'cô',
+  male: 'thầy',
+} as const;
+
+export const ONBOARDING_WELCOME_TEMPLATE = (name: string, pronoun: string) =>
+  `Xin chào **${name}**! ${pronoun.charAt(0).toUpperCase() + pronoun.slice(1)} là gia sư Ngữ Văn sẽ đồng hành cùng em.
+
+Em đang đặt mục tiêu bao nhiêu điểm trong kỳ thi tốt nghiệp? (Thang điểm 10)`;
 
 export const DIAGNOSTIC_QUIZ_PROMPT = `Bạn là Văn Master, chuyên tạo các bài kiểm tra chẩn đoán Ngữ Văn 9+.
 

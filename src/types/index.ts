@@ -5,6 +5,7 @@ export interface Message {
   generatedImage?: string | null;
 }
 
+// Legacy compatibility alias
 export interface UserData {
   level: string;
   status: string;
@@ -12,4 +13,62 @@ export interface UserData {
   xp: number;
   streak: number;
   daysLeft: number;
+}
+
+export interface UserProfile {
+  uid: string;
+  name: string;
+  email: string;
+  targetScore: number | null;
+  voiceGender: 'male' | 'female';
+  isOnboarded: boolean;
+  /** true only after diagnostic assessment (MCQ quiz or exam) is fully complete */
+  assessmentDone: boolean;
+  diagnosticScore?: number | null;
+  /** Running average score across all submitted exams */
+  avgScore: number | null;
+  /** Number of exams submitted (for computing running average) */
+  submissionCount: number;
+  /** Recurring weaknesses detected by AI, sorted by frequency */
+  weaknesses: string[];
+  /** Strengths detected by AI */
+  strengths: string[];
+  level: string;
+  xp: number;
+  streak: number;
+  progress: number;
+  /**
+   * Tracks consecutive submissions where each weakness did NOT appear.
+   * When cleanStreak >= 2 for a weakness, it is auto-removed from `weaknesses`.
+   * Resets to 0 if the weakness reappears in a new submission.
+   */
+  weaknessCleanStreak?: Record<string, number>;
+}
+
+export interface ExamError {
+  quote: string;        // exact student text that has issue
+  issue: string;        // e.g. "Thiếu dẫn chứng cụ thể"
+  suggestion: string;   // rewrite suggestion
+}
+
+export interface ExamGrade {
+  score: number;
+  maxScore: number;
+  feedback: string;       // 2-3 sentence summary
+  details: string;        // per-section breakdown
+  errors: ExamError[];    // specific error blocks
+  improvements: string[]; // rewrite suggestions
+  weaknesses: string[];   // weakness tags for profile
+  strengths: string[];    // strength tags for profile
+}
+
+export interface ExamSubmission {
+  id?: string;
+  examId: number;
+  studentAnswer: string;
+  status: 'pending' | 'graded';
+  cheating?: boolean;
+  createdAt?: unknown;
+  gradedAt?: unknown;
+  grade?: ExamGrade;
 }
