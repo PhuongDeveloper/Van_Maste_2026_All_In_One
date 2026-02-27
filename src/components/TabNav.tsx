@@ -10,7 +10,7 @@ interface TabNavProps {
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode; emoji: string; mobileOnly?: boolean }[] = [
     { id: 'chat', label: 'Học Bài', icon: <BookOpen size={15} />, emoji: '📚' },
-    { id: 'exam', label: 'Làm Bài', icon: <FileText size={15} />, emoji: '✍️' },
+    { id: 'exam', label: 'Luyện đề', icon: <FileText size={15} />, emoji: '✍️' },
     { id: 'stats', label: 'Kỷ Lục', icon: <Trophy size={15} />, emoji: '🏆' },
     // Chỉ hiện trên mobile: trang Lộ Trình chứa nội dung sidebar
     { id: 'roadmap', label: 'Lộ Trình', icon: <Map size={15} />, emoji: '🗺️', mobileOnly: true },
