@@ -10,10 +10,11 @@ import Sidebar from './components/Sidebar';
 import ChatMessage from './components/chat/ChatMessage';
 import SettingsPanel from './components/settings/SettingsPanel';
 import ExamPage from './components/exam/ExamPage';
+import LearningTimeline from './components/learn/LearningTimeline';
 import type { ExamGrade, AIExamData } from './types';
 import './index.css';
 
-type Tab = 'chat' | 'exam' | 'stats' | 'roadmap';
+type Tab = 'chat' | 'learn' | 'exam' | 'stats' | 'roadmap';
 
 function AppContent() {
   const { user, userProfile, loading } = useAuth();
@@ -32,7 +33,14 @@ function AppContent() {
     messages, input, setInput, isLoading,
     previewImage, setPreviewImage, chatEndRef, fileInputRef,
     handleSend, addGradeMsg, startGraphicFlow, startExamFlow,
+    startLesson,
   } = useChat(onStartDiagnosticExam);
+
+  // ── Select lesson from timeline ──────────────────────────────────────
+  const handleSelectLesson = useCallback((sectionId: string, lessonId: string) => {
+    startLesson(sectionId, lessonId);
+    setActiveTab('chat');
+  }, [startLesson]);
 
   // ── Start AI Exam from chat card ──────────────────────────────────────
   const handleStartAIExam = useCallback((exam: AIExamData) => {
@@ -205,6 +213,14 @@ function AppContent() {
                 }}
               />
             </>
+          )}
+
+          {/* Learn Tab (Timeline) */}
+          {activeTab === 'learn' && (
+            <LearningTimeline
+              lessonProgress={userProfile?.lessonProgress || {}}
+              onSelectLesson={handleSelectLesson}
+            />
           )}
 
           {/* Roadmap Tab (mobile: chứa nội dung sidebar) */}

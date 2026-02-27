@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, BookOpen, PenLine } from 'lucide-react';
+import { Play, BookOpen } from 'lucide-react';
 import type { Message, AIExamData } from '../../types';
 import type { ExamGrade } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -104,25 +104,6 @@ function GradeBubble({ grade }: { grade: ExamGrade }) {
 }
 
 /** Card hiển thị câu hỏi luyện tập theo ngữ cảnh */
-function PracticeBubble({ question }: { question: string }) {
-    return (
-        <div style={{
-            marginTop: 10,
-            background: 'linear-gradient(135deg, #1e3a5f 0%, #0f2744 100%)',
-            border: '1px solid rgba(56,189,248,.3)',
-            borderRadius: 14,
-            padding: '12px 16px',
-        }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                <PenLine size={13} color="#38bdf8" />
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#38bdf8', textTransform: 'uppercase', letterSpacing: '.06em' }}>
-                    Câu hỏi luyện tập
-                </span>
-            </div>
-            <p style={{ fontSize: 13.5, color: '#e0f2fe', lineHeight: 1.65, margin: 0 }}>{question}</p>
-        </div>
-    );
-}
 
 /** Card hiển thị đề thi do AI tạo với nút Làm bài */
 function AIExamCard({ exam, onStart }: { exam: AIExamData; onStart: () => void }) {
@@ -239,9 +220,6 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, onPlayTTS, onStartAI
                             </button>
                         )}
                     </div>
-                    {message.practiceQuestion && (
-                        <PracticeBubble question={message.practiceQuestion} />
-                    )}
                     {message.aiExam && onStartAIExam && (
                         <AIExamCard exam={message.aiExam} onStart={() => onStartAIExam(message.aiExam!)} />
                     )}

@@ -22,7 +22,7 @@ import {
     orderBy,
     serverTimestamp,
 } from 'firebase/firestore';
-import type { UserProfile, ExamSubmission, ExamGrade } from '../types';
+import type { UserProfile, ExamSubmission, ExamGrade, LessonProgress } from '../types';
 
 const firebaseConfig = {
     apiKey: "AIzaSyCOwsJrIX6Ni1eWNzo4ytjdrNeVYiEJMjc",
@@ -301,4 +301,42 @@ export async function getExamHistory(uid: string): Promise<Map<number, number>> 
         console.error('getExamHistory error:', e);
     }
     return map;
+}
+
+// ─── Chat Memory (AI persistent context) ────────────────────────────────────
+
+/** Save the last N chat messages for persistent AI memory */
+export async function saveChatMemory(uid: string, messages: { role: string; content: string }[]) {
+    await setDoc(doc(db, 'users', uid, 'memory', 'chatHistory'), {
+        messages: messages.slice(-15), // keep last 15
+        updatedAt: serverTimestamp(),
+    });
+}
+
+/** Load saved chat memory */
+export async function loadChatMemory(uid: string): Promise<{ role: 'user' | 'assistant'; content: string }[]> {
+    try {
+        const snap = await getDoc(doc(db, 'users', uid, 'memory', 'chatHistory'));
+        if (snap.exists()) {
+            const data = snap.data() as { messages?: { role: 'user' | 'assistant'; content: string }[] };
+            return data.messages || [];
+        }
+    } catch (e) {
+        console.error('loadChatMemory error:', e);
+    }
+    return [];
+}
+
+/** Save user personality traits extracted by AI */
+export async function saveUserTraits(uid: string, traits: string[]) {
+    await updateDoc(doc(db, 'users', uid), { userTraits: traits });
+}
+
+// ─── Lesson Progress ────────────────────────────────────────────────────────
+
+/** Update lesson progress for a specific lesson */
+export async function updateLessonProgress(uid: string, lessonKey: string, progress: LessonProgress) {
+    await updateDoc(doc(db, 'users', uid), {
+        [`lessonProgress.${lessonKey}`]: progress,
+    });
 }

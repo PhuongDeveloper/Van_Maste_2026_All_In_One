@@ -5,8 +5,6 @@ export interface Message {
   generatedImage?: string | null;
   /** Attached AI-generated exam — rendered as a special card with a "Làm bài" button */
   aiExam?: AIExamData | null;
-  /** Inline practice question generated after concept explanation */
-  practiceQuestion?: string | null;
 }
 
 export interface AIExamQuestion {
@@ -64,6 +62,24 @@ export interface UserProfile {
    * Resets to 0 if the weakness reappears in a new submission.
    */
   weaknessCleanStreak?: Record<string, number>;
+  /** Lesson progress per lesson key (e.g. "s1-b2") */
+  lessonProgress?: Record<string, LessonProgress>;
+  /** Recent chat messages saved for persistent AI memory */
+  chatMemory?: Message[];
+  /** User personality traits extracted by AI every 20 chat turns */
+  userTraits?: string[];
+}
+
+export interface LessonProgress {
+  status: 'not_started' | 'in_progress' | 'completed';
+  /** Total sections in the DOCX content */
+  sectionsTotal: number;
+  /** Sections the student has been taught so far */
+  sectionsDone: number;
+  /** Practice questions asked during the lesson */
+  questionsAsked: number;
+  /** Practice questions answered correctly */
+  questionsCorrect: number;
 }
 
 export interface ExamError {

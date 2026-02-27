@@ -1,7 +1,7 @@
 import React from 'react';
-import { BookOpen, FileText, Trophy, Map } from 'lucide-react';
+import { BookOpen, FileText, Trophy, Map, GraduationCap } from 'lucide-react';
 
-type Tab = 'chat' | 'exam' | 'stats' | 'roadmap';
+type Tab = 'chat' | 'learn' | 'exam' | 'stats' | 'roadmap';
 
 interface TabNavProps {
     active: Tab;
@@ -10,6 +10,7 @@ interface TabNavProps {
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode; emoji: string; mobileOnly?: boolean }[] = [
     { id: 'chat', label: 'Học Bài', icon: <BookOpen size={15} />, emoji: '📚' },
+    { id: 'learn', label: 'Tiến Trình', icon: <GraduationCap size={15} />, emoji: '🎓' },
     { id: 'exam', label: 'Luyện đề', icon: <FileText size={15} />, emoji: '✍️' },
     { id: 'stats', label: 'Kỷ Lục', icon: <Trophy size={15} />, emoji: '🏆' },
     // Chỉ hiện trên mobile: trang Lộ Trình chứa nội dung sidebar

@@ -24,14 +24,36 @@ BẮT LỖI CHÍNH TẢ:
 - Sau đó vẫn trả lời bình thường nội dung câu hỏi.
 
 CÂU HỎI LUYỆN TẬP:
-- Sau khi giải thích xong một khái niệm, kỹ thuật, hoặc biện pháp tu từ, nếu cảm thấy học sinh đã nghe đủ để thực hành, hãy thêm vào cuối câu trả lời một câu hỏi luyện tập ngắn theo định dạng:
-[PRACTICE]câu hỏi luyện tập cụ thể, có ví dụ văn bản để phân tích[/PRACTICE]
-- Chỉ thêm [PRACTICE] khi bạn vừa giải thích xong một khái niệm hoàn chỉnh, KHÔNG thêm khi đang trả lời câu hỏi hoặc chữa bài.`;
+- Khi muốn kiểm tra học sinh đã hiểu chưa, gửi câu hỏi như tin nhắn bình thường. KHÔNG dùng tag đặc biệt.
+- Chỉ hỏi khi vừa giải thích xong một khái niệm hoàn chỉnh và cảm thấy học sinh cần xác nhận.
+- KHÔNG hỏi sau mỗi câu trả lời. Chỉ hỏi khi thực sự cần đánh giá.`;
 
 export const INFOGRAPHIC_TRIGGER = '[INFOGRAPHIC]';
 
 /** Delay proactive idle question */
 export const PROACTIVE_DELAY_MS = 25_000; // 25 giây
+
+/** Prompt dùng khi AI giảng bài từ DOCX theory content */
+export const LESSON_TEACH_PROMPT = `Bạn đang giảng bài cho học sinh từ nội dung lý thuyết bên dưới. Dựa 100% vào nội dung này, KHÔNG tự bịa thêm.
+
+QUY TẮC GIẢNG BÀI:
+1. Mỗi lần chỉ giảng 1 PHẦN NHỎ (1 khái niệm / 1 ý chính), tối đa 150 từ.
+2. Kèm VÍ DỤ MINH HỌa cụ thể cho phần đó.
+3. Cuối mỗi phần, đặt 1 câu hỏi kiểm tra ngắn để xác nhận học sinh hiểu.
+4. Nếu học sinh trả lời sai câu kiểm tra → giảng lại phần đó bằng cách khác, đơn giản hơn.
+5. Nếu đúng → gửi [SECTION_DONE] rồi chuyển sang phần tiếp theo.
+6. Nếu học sinh trả lời đúng câu kiểm tra → gửi [QUESTION_CORRECT] trước [SECTION_DONE].
+7. Khi hết toàn bộ nội dung → gửi [LESSON_DONE] và chúc mừng học sinh.
+8. KHÔNG tự bịa thêm nội dung ngoài tài liệu.
+9. Dùng giọng thân thiện như giáo viên: "Em xem nhé...", "Phần này quan trọng..."`;
+
+/** Prompt dùng để rút ra đặc điểm người dùng từ 20 lượt chat gần nhất */
+export const USER_TRAITS_PROMPT = `Dựa vào lịch sử chat bên dưới, hãy rút ra 3-5 đặc điểm cá nhân của học sinh này.
+
+VÍ dụ: thói quen học, điểm mạnh/yếu, chủ đề hay hỏi, phong cách giao tiếp.
+
+Trả về JSON THUẦN (không markdown):
+["trait 1", "trait 2", "trait 3"]`;
 
 /** Prompt dùng khi AI chủ động hỏi sau inactivity */
 export const PROACTIVE_PROMPT = `Dựa vào lịch sử chat bên dưới, hãy đặt 1 câu hỏi ngắn (tối đa 25 từ) để gợi ý bước tiếp theo cho học sinh. KHÔNG chào hỏi, KHÔNG tóm tắt lại, chỉ hỏi thẳng câu gợi ý hành động cụ thể. Ví dụ: "Em có muốn thầy ra một đề tập viết về chủ đề này không?" hoặc "Em còn thắc mắc phần nào về đoạn vừa học không?".`;

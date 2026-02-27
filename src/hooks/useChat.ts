@@ -14,6 +14,8 @@ import {
     AI_EXAM_PROMPT_READING,
     AI_EXAM_PROMPT_WRITING,
     AI_EXAM_PROMPT_FULL,
+    LESSON_TEACH_PROMPT,
+    USER_TRAITS_PROMPT,
 } from '../constants';
 import {
     sendChatMessage,
@@ -25,11 +27,14 @@ import {
     generateInfographic,
     generateImage,
     generateAIExam,
+    sendGradingRequest,
 } from '../services/geminiApi';
 import type { DiagnosticQuizData } from '../services/geminiApi';
 import { playTTS } from '../services/ttsService';
 import { useAuth } from '../context/AuthContext';
-import { saveTargetScore, completeAssessment } from '../services/firebaseService';
+import { saveTargetScore, completeAssessment, saveChatMemory, loadChatMemory, saveUserTraits, updateLessonProgress } from '../services/firebaseService';
+import { findLesson, getLessonKey } from '../constants/curriculum';
+import { fetchDocxAsText } from '../services/examService';
 
 function extractScore(text: string): number | null {
     const match = text.match(/\b(\d+(?:[.,]\d+)?)\b/);
@@ -76,6 +81,12 @@ export function useChat(onStartDiagnosticExam?: () => void) {
     const [awaitingExamTypeChoice, setAwaitingExamTypeChoice] = useState(false);
     const [quizState, setQuizState] = useState<QuizState>(QUIZ_INIT);
     const [pendingGraphicPrompt, setPendingGraphicPrompt] = useState(false);
+
+    // ── Lesson mode state ─────────────────────────────────────────────────────────
+    const [activeLesson, setActiveLesson] = useState<{
+        sectionId: string; lessonId: string; docxContent: string;
+    } | null>(null);
+    const chatTurnCountRef = useRef(0);
 
     const chatEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -155,6 +166,31 @@ B. Trả lời 10 câu trắc nghiệm nhanh`;
 
         return () => clearTimeout(timerId);
     }, [userProfile?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // ── Load chat memory from Firebase on mount ────────────────────────────
+    const memoryLoadedRef = useRef(false);
+    useEffect(() => {
+        if (!user || memoryLoadedRef.current) return;
+        memoryLoadedRef.current = true;
+        loadChatMemory(user.uid).then((saved: Message[]) => {
+            if (saved && saved.length > 0) {
+                // Prepend saved memory before any greeting
+                setMessages(prev => prev.length === 0 ? saved : prev);
+            }
+        });
+    }, [user]);
+
+    // ── Save chat memory to Firebase (debounced) ──────────────────────────
+    const memorySaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => {
+        if (!user || messages.length === 0) return;
+        if (memorySaveTimerRef.current) clearTimeout(memorySaveTimerRef.current);
+        memorySaveTimerRef.current = setTimeout(() => {
+            const last15 = messages.slice(-15);
+            saveChatMemory(user.uid, last15).catch(console.error);
+        }, 3000); //  debounce 3s
+        return () => { if (memorySaveTimerRef.current) clearTimeout(memorySaveTimerRef.current); };
+    }, [messages, user]);
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -433,7 +469,17 @@ Phong cách: màu sắc ấm, chữ dễ đọc, phù hợp học sinh ôn thi t
 
         setIsLoading(true);
         try {
-            const { text: aiContent, generatedImageUrl } = await sendChatMessage(messages, val, previewImage);
+            // Build enhanced prompt with lesson context + user memory
+            let effectiveInput = val;
+            if (activeLesson) {
+                effectiveInput = `${LESSON_TEACH_PROMPT}\n\n[NỘI DUNG LÝ THUYẾT]:\n${activeLesson.docxContent}\n\n[CÂU TRẢ LỜI CỦA HỌC SINH]: ${val}`;
+            }
+            // Inject user memory/traits for personalization
+            const traits = userProfile?.userTraits;
+            if (traits && traits.length > 0) {
+                effectiveInput = `[TRÍ NHỚ VỀ HỌC SINH]: ${traits.join('; ')}\n\n${effectiveInput}`;
+            }
+            const { text: aiContent, generatedImageUrl } = await sendChatMessage(messages, effectiveInput, previewImage);
 
             // ── Detect [INFOGRAPHIC] tag → tạo ảnh infographic im lặng ─────────
             const infMatch = aiContent.match(/\[INFOGRAPHIC\]([^\[]*)\[\/INFOGRAPHIC\]/);
@@ -480,17 +526,9 @@ Phong cách: màu sắc ấm, chữ dễ đọc, phù hợp học sinh ôn thi t
                 playNotification();
                 autoSpeak(ack);
             } else {
-                // ── Normal text response — parse [PRACTICE] and [AI_EXAM] tags ──
+                // ── Normal text response — parse [AI_EXAM] + lesson tags ──
                 let cleanContent = aiContent;
-                let practiceQuestion: string | null = null;
                 let aiExamData: AIExamData | null = null;
-
-                // Parse [PRACTICE]...[/PRACTICE]
-                const practiceMatch = cleanContent.match(/\[PRACTICE\]([\s\S]*?)\[\/PRACTICE\]/);
-                if (practiceMatch) {
-                    practiceQuestion = practiceMatch[1].trim();
-                    cleanContent = cleanContent.replace(/\[PRACTICE\][\s\S]*?\[\/PRACTICE\]/, '').trim();
-                }
 
                 // Parse [AI_EXAM] {...} [/AI_EXAM]
                 const examMatch = cleanContent.match(/\[AI_EXAM\]([\s\S]*?)\[\/AI_EXAM\]/);
@@ -501,13 +539,47 @@ Phong cách: màu sắc ấm, chữ dễ đọc, phù hợp học sinh ôn thi t
                     cleanContent = cleanContent.replace(/\[AI_EXAM\][\s\S]*?\[\/AI_EXAM\]/, '').trim();
                 }
 
+                // ── Lesson progress tags ──
+                if (activeLesson && user && userProfile) {
+                    const lessonKey = getLessonKey(activeLesson.sectionId, activeLesson.lessonId);
+                    const lp = userProfile.lessonProgress?.[lessonKey] || {
+                        status: 'in_progress' as const, sectionsTotal: 10, sectionsDone: 0,
+                        questionsAsked: 0, questionsCorrect: 0,
+                    };
+                    let changed = false;
+                    if (cleanContent.includes('[QUESTION_CORRECT]')) {
+                        cleanContent = cleanContent.replace(/\[QUESTION_CORRECT\]/g, '').trim();
+                        lp.questionsCorrect += 1;
+                        lp.questionsAsked += 1;
+                        changed = true;
+                    }
+                    if (cleanContent.includes('[SECTION_DONE]')) {
+                        cleanContent = cleanContent.replace(/\[SECTION_DONE\]/g, '').trim();
+                        lp.sectionsDone += 1;
+                        changed = true;
+                    }
+                    if (cleanContent.includes('[LESSON_DONE]')) {
+                        cleanContent = cleanContent.replace(/\[LESSON_DONE\]/g, '').trim();
+                        lp.status = 'completed';
+                        lp.sectionsDone = lp.sectionsTotal;
+                        setActiveLesson(null);
+                        changed = true;
+                    }
+                    if (changed) {
+                        updateLessonProgress(user.uid, lessonKey, lp).catch(console.error);
+                        setUserProfile(p => p ? {
+                            ...p,
+                            lessonProgress: { ...p.lessonProgress, [lessonKey]: lp },
+                        } : p);
+                    }
+                }
+
                 setMessages(p => {
                     const next = [
                         ...p,
                         {
                             role: 'assistant' as const,
                             content: cleanContent,
-                            ...(practiceQuestion ? { practiceQuestion } : {}),
                             ...(aiExamData ? { aiExam: aiExamData } : {}),
                         },
                     ];
@@ -518,6 +590,24 @@ Phong cách: màu sắc ấm, chữ dễ đọc, phù hợp học sinh ôn thi t
                 if (cleanContent) autoSpeak(cleanContent);
             }
             if (user && userProfile) {
+                // Track chat turns for user traits extraction
+                chatTurnCountRef.current += 1;
+                if (chatTurnCountRef.current % 20 === 0) {
+                    // Extract user traits every 20 turns
+                    const last20 = messages.slice(-20);
+                    const traitsPrompt = USER_TRAITS_PROMPT + '\n\n' + last20.map(m => `${m.role}: ${m.content}`).join('\n');
+                    sendGradingRequest(traitsPrompt).then((raw: string) => {
+                        try {
+                            const cleanRaw = raw.replace(/^```json\s*/i, '').replace(/```$/i, '').trim();
+                            const traits = JSON.parse(cleanRaw) as string[];
+                            if (Array.isArray(traits)) {
+                                saveUserTraits(user.uid, traits).catch(console.error);
+                                setUserProfile(p => p ? { ...p, userTraits: traits } : p);
+                            }
+                        } catch { /* ignore */ }
+                    }).catch(() => { });
+                }
+
                 import('../services/firebaseService').then(({ updateUserProfile }) => {
                     updateUserProfile(user.uid, {
                         xp: (userProfile.xp || 0) + 50,
@@ -620,6 +710,46 @@ Phong cách: màu sắc ấm, chữ dễ đọc, phù hợp học sinh ôn thi t
         askGraphicTopic();
     };
 
+    // ── Start lesson flow ───────────────────────────────────────────────────
+    const startLesson = useCallback(async (sectionId: string, lessonId: string) => {
+        const found = findLesson(sectionId, lessonId);
+        if (!found) return;
+        const { lesson } = found;
+
+        // Clear existing messages and show intro
+        setMessages([]);
+        addAssistant(`Sau đây thầy sẽ cùng em bắt đầu học bài: "${lesson.title}" nhé. Em đã sẵn sàng chưa?`);
+
+        // Fetch DOCX content
+        try {
+            const docxContent = await fetchDocxAsText(lesson.docxPath);
+            setActiveLesson({ sectionId, lessonId, docxContent });
+
+            // Mark lesson as in_progress in Firebase
+            if (user) {
+                const key = getLessonKey(sectionId, lessonId);
+                const existing = userProfile?.lessonProgress?.[key];
+                if (!existing || existing.status === 'not_started') {
+                    const lp = {
+                        status: 'in_progress' as const,
+                        sectionsTotal: 10, // will be refined as AI teaches
+                        sectionsDone: 0,
+                        questionsAsked: 0,
+                        questionsCorrect: 0,
+                    };
+                    updateLessonProgress(user.uid, key, lp).catch(console.error);
+                    setUserProfile(p => p ? {
+                        ...p,
+                        lessonProgress: { ...p.lessonProgress, [key]: lp },
+                    } : p);
+                }
+            }
+        } catch (e) {
+            console.error('Failed to load lesson DOCX:', e);
+            addAssistant('Lỗi tải tài liệu bài học. Em thử lại sau nhé.');
+        }
+    }, [addAssistant, user, userProfile, setUserProfile]);
+
     return {
         messages, input, isLoading, isRewriting, isDiagnosing, isPlayingAudio, previewImage,
         quizPhase: quizState.phase,
@@ -635,7 +765,7 @@ Phong cách: màu sắc ấm, chữ dễ đọc, phù hợp học sinh ôn thi t
         chatEndRef, fileInputRef,
         setInput, setPreviewImage,
         handleSend, handleMagicRewrite, handlePlayTTS, startDiagnosis, handleFileSelect,
-        startGraphicFlow, startExamFlow, handleExamTypeChoice,
+        startGraphicFlow, startExamFlow, handleExamTypeChoice, startLesson,
         addGradeMsg: (grade: ExamGrade, resolvedWeaknesses?: string[]) => {
             const scoreOutOf10 = +(grade.score / grade.maxScore * 10).toFixed(1);
             const label = scoreOutOf10 >= 8 ? 'Xuất sắc' : scoreOutOf10 >= 6.5 ? 'Khá' : scoreOutOf10 >= 5 ? 'Trung bình' : 'Cần cố gắng';
