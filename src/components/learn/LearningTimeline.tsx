@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { CheckCircle, Lock, Play, ChevronRight } from 'lucide-react';
 import { CURRICULUM } from '../../constants/curriculum';
 import type { LessonProgress } from '../../types';
@@ -71,7 +71,15 @@ export default function LearningTimeline({ lessonProgress, onSelectLesson }: Lea
                                 position: 'relative',
                             }}
                         >
-                            <div style={{ fontSize: 18, marginBottom: 4, transition: 'transform 0.2s', transform: isActive ? 'scale(1.1)' : 'scale(1)' }}>{sec.icon}</div>
+                            <div style={{
+                                width: 24, height: 24, margin: '0 auto 8px',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                transition: 'all 0.3s ease',
+                                transform: isActive ? 'scale(1.15) translateY(-2px)' : 'scale(1)',
+                                color: isActive ? 'var(--color-primary)' : 'var(--color-text-muted)'
+                            }}>
+                                {sec.icon && React.cloneElement(sec.icon as React.ReactElement, { size: isActive ? 22 : 20, strokeWidth: isActive ? 2.5 : 2 })}
+                            </div>
                             <div style={{
                                 fontSize: 12,
                                 fontWeight: isActive ? 700 : 600,
@@ -102,11 +110,20 @@ export default function LearningTimeline({ lessonProgress, onSelectLesson }: Lea
                 flexShrink: 0,
                 background: 'var(--color-surface-2)',
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                    <div style={{ width: 40, height: 40, background: 'var(--color-surface)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, boxShadow: 'var(--shadow-sm)' }}>
-                        {currentSection.icon}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+                    <div style={{
+                        width: 48, height: 48, background: 'var(--color-surface)', borderRadius: 14,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: currentSection.color,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                        border: '1px solid var(--color-border)'
+                    }}>
+                        {currentSection.icon && React.cloneElement(currentSection.icon as React.ReactElement, { size: 24, strokeWidth: 2.5 })}
                     </div>
-                    <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>{currentSection.title}</h2>
+                    <div>
+                        <h2 style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-text)', margin: '0 0 4px 0', letterSpacing: '-0.02em' }}>{currentSection.title}</h2>
+                        <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', fontWeight: 500 }}>Lộ trình học tập cơ bản</div>
+                    </div>
                 </div>
 
                 {/* Overall section progress bar */}
@@ -183,21 +200,24 @@ export default function LearningTimeline({ lessonProgress, onSelectLesson }: Lea
                                 border: '1px solid',
                                 borderColor: isCompleted ? '#bbf7d0' : isInProgress ? 'var(--color-primary-light)' : 'var(--color-border)',
                                 borderRadius: 16,
-                                padding: '16px 20px',
+                                padding: '18px 22px',
                                 cursor: 'pointer',
-                                transition: 'all .25s ease',
-                                boxShadow: isCompleted ? '0 4px 12px rgba(22, 163, 74, 0.08)' : isInProgress ? '0 4px 12px rgba(21, 101, 192, 0.08)' : 'var(--shadow-sm)',
-                                opacity: status === 'not_started' && idx > 0 ? 0.75 : 1,
+                                transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                                boxShadow: isCompleted ? '0 4px 20px rgba(22, 163, 74, 0.08)' : isInProgress ? '0 8px 24px rgba(21, 101, 192, 0.08)' : '0 2px 8px rgba(0,0,0,0.02)',
+                                opacity: status === 'not_started' && idx > 0 ? 0.6 : 1,
+                                transform: 'translateY(0)',
                             }}
-                            className="hover-scale"
+                            className="hover-card"
                             onClick={() => onSelectLesson(currentSection.id, lesson.id)}
                             onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-2px)';
-                                e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+                                e.currentTarget.style.transform = 'translateY(-4px)';
+                                e.currentTarget.style.boxShadow = isCompleted ? '0 12px 28px rgba(22, 163, 74, 0.12)' : isInProgress ? '0 12px 32px rgba(21, 101, 192, 0.12)' : '0 8px 24px rgba(0,0,0,0.06)';
+                                e.currentTarget.style.borderColor = isCompleted ? '#86efac' : isInProgress ? 'var(--color-primary)' : 'var(--color-border-hover)';
                             }}
                             onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'none';
-                                e.currentTarget.style.boxShadow = isCompleted ? '0 4px 12px rgba(22, 163, 74, 0.08)' : isInProgress ? '0 4px 12px rgba(21, 101, 192, 0.08)' : 'var(--shadow-sm)';
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = isCompleted ? '0 4px 20px rgba(22, 163, 74, 0.08)' : isInProgress ? '0 8px 24px rgba(21, 101, 192, 0.08)' : '0 2px 8px rgba(0,0,0,0.02)';
+                                e.currentTarget.style.borderColor = isCompleted ? '#bbf7d0' : isInProgress ? 'var(--color-primary-light)' : 'var(--color-border)';
                             }}
                         >
                             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
