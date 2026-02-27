@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { CheckCircle, Lock, Play, ChevronRight } from 'lucide-react';
 import { CURRICULUM } from '../../constants/curriculum';
 import type { LessonProgress } from '../../types';
@@ -59,29 +59,29 @@ export default function LearningTimeline({ lessonProgress, onSelectLesson }: Lea
                             style={{
                                 flex: '1 0 auto',
                                 minWidth: 0,
-                                padding: '14px 14px 12px',
+                                padding: '10px 12px 10px',
                                 background: isActive ? 'var(--color-surface-3)' : 'transparent',
                                 border: 'none',
                                 borderBottom: isActive ? `2px solid var(--color-primary)` : '2px solid transparent',
                                 color: isActive ? 'var(--color-primary)' : 'var(--color-text-secondary)',
                                 cursor: 'pointer',
                                 textAlign: 'center',
-                                transition: 'all .25s ease',
+                                transition: 'all 0.2s',
                                 fontFamily: 'inherit',
                                 position: 'relative',
                             }}
                         >
                             <div style={{
-                                width: 24, height: 24, margin: '0 auto 8px',
+                                width: 20, height: 20, margin: '0 auto 4px',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                transition: 'all 0.3s ease',
-                                transform: isActive ? 'scale(1.15) translateY(-2px)' : 'scale(1)',
-                                color: isActive ? 'var(--color-primary)' : 'var(--color-text-muted)'
+                                color: isActive ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                                transition: 'color 0.2s, transform 0.2s',
+                                transform: isActive ? 'scale(1.1)' : 'scale(1)'
                             }}>
-                                {sec.icon && React.cloneElement(sec.icon as React.ReactElement, { size: isActive ? 22 : 20, strokeWidth: isActive ? 2.5 : 2 })}
+                                {sec.icon && <sec.icon size={isActive ? 20 : 18} strokeWidth={isActive ? 2.5 : 2} />}
                             </div>
                             <div style={{
-                                fontSize: 12,
+                                fontSize: 13,
                                 fontWeight: isActive ? 700 : 600,
                                 whiteSpace: 'nowrap',
                                 overflow: 'hidden',
@@ -93,9 +93,6 @@ export default function LearningTimeline({ lessonProgress, onSelectLesson }: Lea
                                     color: pct === 100 ? 'var(--color-success)' : 'var(--color-text-muted)',
                                     fontWeight: 700,
                                     marginTop: 4,
-                                    background: pct === 100 ? '#dcfce7' : 'var(--color-border)',
-                                    padding: '2px 6px',
-                                    borderRadius: 10,
                                     display: 'inline-block'
                                 }}>{pct === 100 ? 'Hoàn thành' : `${pct}%`}</div>
                             )}
@@ -106,23 +103,23 @@ export default function LearningTimeline({ lessonProgress, onSelectLesson }: Lea
 
             {/* ── Section Header + Overall Progress ── */}
             <div style={{
-                padding: '24px 24px 16px',
+                padding: '20px 24px 12px',
                 flexShrink: 0,
                 background: 'var(--color-surface-2)',
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
                     <div style={{
-                        width: 48, height: 48, background: 'var(--color-surface)', borderRadius: 14,
+                        width: 40, height: 40, background: 'var(--color-surface)', borderRadius: 12,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         color: currentSection.color,
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                        boxShadow: 'var(--shadow-sm)',
                         border: '1px solid var(--color-border)'
                     }}>
-                        {currentSection.icon && React.cloneElement(currentSection.icon as React.ReactElement, { size: 24, strokeWidth: 2.5 })}
+                        {currentSection.icon && <currentSection.icon size={20} strokeWidth={2.5} />}
                     </div>
                     <div>
-                        <h2 style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-text)', margin: '0 0 4px 0', letterSpacing: '-0.02em' }}>{currentSection.title}</h2>
-                        <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', fontWeight: 500 }}>Lộ trình học tập cơ bản</div>
+                        <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 2px 0' }}>{currentSection.title}</h2>
+                        <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>Lộ trình học tập cơ bản</div>
                     </div>
                 </div>
 
@@ -158,18 +155,17 @@ export default function LearningTimeline({ lessonProgress, onSelectLesson }: Lea
                 {/* Section complete banner */}
                 {getSectionPct(activeSection, lessonProgress) === 100 && (
                     <div style={{
-                        marginTop: 16,
+                        marginTop: 12,
                         background: '#dcfce7',
                         border: '1px solid #bbf7d0',
-                        borderRadius: 12,
-                        padding: '12px 16px',
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        boxShadow: '0 2px 4px rgba(22, 163, 74, 0.05)',
+                        borderRadius: 8,
+                        padding: '8px 12px',
+                        display: 'flex', alignItems: 'center', gap: 6,
                         animation: 'slideUp 0.3s ease-out'
                     }}>
-                        <CheckCircle size={18} color="var(--color-success)" />
-                        <span style={{ fontSize: 13, fontWeight: 600, color: '#166534' }}>
-                            Xuất sắc! Bạn đã hoàn thành toàn bộ phần {currentSection.title}.
+                        <CheckCircle size={16} color="var(--color-success)" />
+                        <span style={{ fontSize: 12, fontWeight: 600, color: '#166534' }}>
+                            Đã hoàn thành phần này!
                         </span>
                     </div>
                 )}
@@ -182,7 +178,7 @@ export default function LearningTimeline({ lessonProgress, onSelectLesson }: Lea
                 padding: '0 24px 24px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 12,
+                gap: 8,
             }}>
                 {currentSection.lessons.map((lesson, idx) => {
                     const key = `${currentSection.id}-${lesson.id}`;
@@ -199,107 +195,86 @@ export default function LearningTimeline({ lessonProgress, onSelectLesson }: Lea
                                 background: 'var(--color-surface)',
                                 border: '1px solid',
                                 borderColor: isCompleted ? '#bbf7d0' : isInProgress ? 'var(--color-primary-light)' : 'var(--color-border)',
-                                borderRadius: 16,
-                                padding: '18px 22px',
+                                borderRadius: 12,
+                                padding: '12px 16px',
                                 cursor: 'pointer',
-                                transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                                boxShadow: isCompleted ? '0 4px 20px rgba(22, 163, 74, 0.08)' : isInProgress ? '0 8px 24px rgba(21, 101, 192, 0.08)' : '0 2px 8px rgba(0,0,0,0.02)',
-                                opacity: status === 'not_started' && idx > 0 ? 0.6 : 1,
-                                transform: 'translateY(0)',
+                                transition: 'all 0.2s',
+                                opacity: status === 'not_started' && idx > 0 ? 0.7 : 1,
                             }}
                             className="hover-card"
                             onClick={() => onSelectLesson(currentSection.id, lesson.id)}
                             onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = 'translateY(-4px)';
-                                e.currentTarget.style.boxShadow = isCompleted ? '0 12px 28px rgba(22, 163, 74, 0.12)' : isInProgress ? '0 12px 32px rgba(21, 101, 192, 0.12)' : '0 8px 24px rgba(0,0,0,0.06)';
                                 e.currentTarget.style.borderColor = isCompleted ? '#86efac' : isInProgress ? 'var(--color-primary)' : 'var(--color-border-hover)';
+                                e.currentTarget.style.background = 'var(--color-surface-hover)';
                             }}
                             onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = isCompleted ? '0 4px 20px rgba(22, 163, 74, 0.08)' : isInProgress ? '0 8px 24px rgba(21, 101, 192, 0.08)' : '0 2px 8px rgba(0,0,0,0.02)';
                                 e.currentTarget.style.borderColor = isCompleted ? '#bbf7d0' : isInProgress ? 'var(--color-primary-light)' : 'var(--color-border)';
+                                e.currentTarget.style.background = 'var(--color-surface)';
                             }}
                         >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                                 {/* Status icon */}
                                 <div style={{
-                                    width: 44, height: 44, borderRadius: 12,
+                                    width: 36, height: 36, borderRadius: 10,
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     background: isCompleted ? '#dcfce7' : isInProgress ? '#eff6ff' : 'var(--color-surface-3)',
                                     color: isCompleted ? 'var(--color-success)' : isInProgress ? 'var(--color-primary)' : 'var(--color-text-muted)',
                                     flexShrink: 0,
                                 }}>
                                     {isCompleted
-                                        ? <CheckCircle size={20} />
+                                        ? <CheckCircle size={18} />
                                         : isInProgress
-                                            ? <Play size={18} fill="currentColor" />
-                                            : <Lock size={16} />
+                                            ? <Play size={16} fill="currentColor" />
+                                            : <Lock size={14} />
                                     }
                                 </div>
 
                                 {/* Lesson info */}
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                     <div style={{
-                                        fontSize: 14.5, fontWeight: (isInProgress || isCompleted) ? 700 : 600,
-                                        color: isCompleted ? '#166534' : isInProgress ? 'var(--color-primary-dark)' : 'var(--color-text)',
+                                        fontSize: 14, fontWeight: 600,
+                                        color: 'var(--color-text)',
                                         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                                     }}>
-                                        Bài {idx + 1}: {lesson.title}
+                                        {idx + 1}. {lesson.title}
                                     </div>
                                     {(isInProgress || isCompleted) && lp && (
                                         <div style={{
-                                            fontSize: 11.5, color: 'var(--color-text-secondary)', marginTop: 4,
-                                            fontWeight: 500
+                                            fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2,
                                         }}>
                                             {lp.sectionsDone}/{lp.sectionsTotal} phần
-                                            {lp.questionsAsked > 0 && ` • ${lp.questionsCorrect}/${lp.questionsAsked} câu đúng`}
-                                        </div>
-                                    )}
-                                    {status === 'not_started' && (
-                                        <div style={{ fontSize: 11.5, color: 'var(--color-text-muted)', marginTop: 4 }}>
-                                            Chưa bắt đầu học
+                                            {lp.questionsAsked > 0 && ` • ${lp.questionsCorrect}/${lp.questionsAsked} câu`}
                                         </div>
                                     )}
                                 </div>
 
                                 {/* Action / badge */}
-                                <div style={{ flexShrink: 0 }}>
+                                <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
                                     {isCompleted ? (
-                                        <span style={{
-                                            fontSize: 11, fontWeight: 700, color: 'var(--color-success)',
-                                            background: '#dcfce7',
-                                            padding: '4px 10px', borderRadius: 20,
-                                        }}>Hoàn thành</span>
+                                        <span style={{ fontSize: 13, color: 'var(--color-success)', fontWeight: 600 }}>Xong</span>
                                     ) : isInProgress ? (
-                                        <span style={{
-                                            fontSize: 11, fontWeight: 700, color: 'var(--color-primary)',
-                                            background: '#eff6ff',
-                                            padding: '4px 10px', borderRadius: 20,
-                                        }}>Đang học</span>
-                                    ) : (
-                                        <ChevronRight size={20} color="var(--color-text-muted)" />
-                                    )}
+                                        <span style={{ fontSize: 13, color: 'var(--color-primary)', fontWeight: 600 }}>Tiếp tục</span>
+                                    ) : null}
+                                    <ChevronRight size={18} color="var(--color-text-muted)" />
                                 </div>
                             </div>
 
                             {/* Progress bar (visible when in-progress) */}
                             {isInProgress && pct > 0 && (
-                                <div style={{ marginTop: 14 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div style={{ marginTop: 12, marginLeft: 48, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <div style={{
+                                        height: 4, borderRadius: 2, background: 'var(--color-border)', flex: 1, overflow: 'hidden'
+                                    }}>
                                         <div style={{
-                                            height: 5, borderRadius: 3, background: '#eff6ff', flex: 1, overflow: 'hidden'
-                                        }}>
-                                            <div style={{
-                                                height: '100%', borderRadius: 3,
-                                                width: `${pct}%`,
-                                                background: 'var(--color-primary)',
-                                                transition: 'width .5s ease',
-                                            }} />
-                                        </div>
-                                        <div style={{
-                                            fontSize: 11, color: 'var(--color-primary)', fontWeight: 700, minWidth: 32, textAlign: 'right'
-                                        }}>{pct}%</div>
+                                            height: '100%', borderRadius: 2,
+                                            width: `${pct}%`,
+                                            background: 'var(--color-primary)',
+                                            transition: 'width .3s ease',
+                                        }} />
                                     </div>
+                                    <div style={{
+                                        fontSize: 11, color: 'var(--color-primary)', fontWeight: 600, minWidth: 28, textAlign: 'right'
+                                    }}>{pct}%</div>
                                 </div>
                             )}
                         </div>

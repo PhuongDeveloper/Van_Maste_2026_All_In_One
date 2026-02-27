@@ -3,8 +3,7 @@
  * Each lesson maps to a DOCX file in /public/lythuyet/...
  */
 
-import React from 'react';
-import { BookOpen, Search, Edit3, PenTool } from 'lucide-react';
+import { BookOpen, Search, Edit3, PenTool, LucideIcon } from 'lucide-react';
 
 export interface CurriculumLesson {
     id: string;       // e.g. "b1"
@@ -15,7 +14,7 @@ export interface CurriculumLesson {
 export interface CurriculumSection {
     id: string;        // e.g. "s1"
     title: string;
-    icon: React.ReactNode; // lucide icon
+    icon: LucideIcon; // lucide icon component reference
     color: string;     // primary color
     lessons: CurriculumLesson[];
 }
@@ -24,7 +23,7 @@ export const CURRICULUM: CurriculumSection[] = [
     {
         id: 's1',
         title: 'Tri Thức Ngữ Văn',
-        icon: <BookOpen />,
+        icon: BookOpen,
         color: '#3b82f6',
         lessons: [
             { id: 'b1', title: 'Ôn tập tri thức ngữ văn lớp 10', docxPath: '/lythuyet/trithucnguvan/bai1/lythuyet.docx' },
@@ -35,7 +34,7 @@ export const CURRICULUM: CurriculumSection[] = [
     {
         id: 's2',
         title: 'Đọc Hiểu',
-        icon: <Search />,
+        icon: Search,
         color: '#8b5cf6',
         lessons: [
             { id: 'b1', title: 'Lý thuyết đọc hiểu', docxPath: '/lythuyet/dochieu/bai1/lythuyet.docx' },
@@ -45,7 +44,7 @@ export const CURRICULUM: CurriculumSection[] = [
     {
         id: 's3',
         title: 'Viết Đoạn Văn',
-        icon: <Edit3 />,
+        icon: Edit3,
         color: '#f59e0b',
         lessons: [
             { id: 'b1', title: 'Lý thuyết viết đoạn văn', docxPath: '/lythuyet/vietdoan/bai1/lythuyet.docx' },
@@ -56,7 +55,7 @@ export const CURRICULUM: CurriculumSection[] = [
     {
         id: 's4',
         title: 'Viết Bài Văn',
-        icon: <PenTool />,
+        icon: PenTool,
         color: '#10b981',
         lessons: [
             { id: 'b1', title: 'Lý thuyết viết bài văn', docxPath: '/lythuyet/vietbai/bai1/lythuyet.docx' },
