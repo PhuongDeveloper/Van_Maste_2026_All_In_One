@@ -68,6 +68,11 @@ export interface UserProfile {
   chatMemory?: Message[];
   /** User personality traits extracted by AI every 20 chat turns */
   userTraits?: string[];
+  /** Currently active lesson (if any) - saved to resume learning */
+  activeLesson?: {
+    sectionId: string;
+    lessonId: string;
+  } | null;
 }
 
 export interface LessonProgress {
@@ -76,6 +81,8 @@ export interface LessonProgress {
   sectionsTotal: number;
   /** Sections the student has been taught so far */
   sectionsDone: number;
+  /** Current section index being taught (0-based, for resuming) */
+  currentSectionIndex?: number;
   /** Practice questions asked during the lesson */
   questionsAsked: number;
   /** Practice questions answered correctly */

@@ -43,6 +43,50 @@ export async function fetchDocxAsText(url: string): Promise<string> {
 }
 
 /**
+ * Estimate the number of main sections in a DOCX text content.
+ * Looks for common patterns: numbered sections, headings, or clear paragraph breaks.
+ */
+export function estimateSectionCount(content: string): number {
+    if (!content || content.trim().length === 0) return 10; // default
+    
+    const text = content.trim();
+    
+    // Pattern 1: Numbered sections (1., 2., 3., etc.)
+    const numberedPattern = /^\s*[0-9]+[\.\)]\s+/gm;
+    const numberedMatches = text.match(numberedPattern);
+    if (numberedMatches && numberedMatches.length > 0) {
+        return Math.max(numberedMatches.length, 5); // at least 5 sections
+    }
+    
+    // Pattern 2: Roman numerals (I., II., III., etc.)
+    const romanPattern = /^\s*[IVX]+[\.\)]\s+/gm;
+    const romanMatches = text.match(romanPattern);
+    if (romanMatches && romanMatches.length > 0) {
+        return Math.max(romanMatches.length, 5);
+    }
+    
+    // Pattern 3: "PHẦN", "CHƯƠNG", "MỤC" keywords
+    const sectionKeywords = /(?:PHẦN|CHƯƠNG|MỤC|BÀI)\s+[0-9IVX]+/gi;
+    const keywordMatches = text.match(sectionKeywords);
+    if (keywordMatches && keywordMatches.length > 0) {
+        return Math.max(keywordMatches.length, 5);
+    }
+    
+    // Pattern 4: Double line breaks (clear paragraph separation)
+    // Count significant breaks (2+ newlines) as potential section dividers
+    const doubleBreaks = text.split(/\n\s*\n\s*\n/);
+    if (doubleBreaks.length > 3) {
+        return Math.min(Math.max(doubleBreaks.length - 1, 5), 20); // between 5-20
+    }
+    
+    // Pattern 5: Estimate based on content length
+    // Assume ~500-800 characters per section on average
+    const charCount = text.length;
+    const estimated = Math.max(Math.ceil(charCount / 600), 5);
+    return Math.min(estimated, 25); // cap at 25 sections
+}
+
+/**
  * Deep AI grading — strict THPT Quoc Gia standard.
  * Grades each criterion from the official answer key.
  */

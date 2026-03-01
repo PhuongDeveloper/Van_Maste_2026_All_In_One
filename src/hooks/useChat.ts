@@ -32,9 +32,9 @@ import {
 import type { DiagnosticQuizData } from '../services/geminiApi';
 import { playTTS } from '../services/ttsService';
 import { useAuth } from '../context/AuthContext';
-import { saveTargetScore, completeAssessment, saveChatMemory, loadChatMemory, saveUserTraits, updateLessonProgress } from '../services/firebaseService';
+import { saveTargetScore, completeAssessment, saveChatMemory, loadChatMemory, saveUserTraits, updateLessonProgress, saveActiveLesson, clearActiveLesson } from '../services/firebaseService';
 import { findLesson, getLessonKey } from '../constants/curriculum';
-import { fetchDocxAsText } from '../services/examService';
+import { fetchDocxAsText, estimateSectionCount } from '../services/examService';
 
 function extractScore(text: string): number | null {
     const match = text.match(/\b(\d+(?:[.,]\d+)?)\b/);
@@ -81,6 +81,7 @@ export function useChat(onStartDiagnosticExam?: () => void) {
     const [awaitingExamTypeChoice, setAwaitingExamTypeChoice] = useState(false);
     const [quizState, setQuizState] = useState<QuizState>(QUIZ_INIT);
     const [pendingGraphicPrompt, setPendingGraphicPrompt] = useState(false);
+    const [awaitingResumeChoice, setAwaitingResumeChoice] = useState(false);
 
     // ── Lesson mode state ─────────────────────────────────────────────────────────
     const [activeLesson, setActiveLesson] = useState<{
@@ -133,7 +134,7 @@ export function useChat(onStartDiagnosticExam?: () => void) {
         // Determine onboarding state on load:
         // a) Never set up target → full onboarding
         // b) Has target but assessment not done → resume A/B choice
-        // c) Fully onboarded → returning greeting
+        // c) Fully onboarded → check for active lesson to resume
         if (!userProfile.targetScore) {
             setAwaitingScore(true);
             const welcome = ONBOARDING_WELCOME_TEMPLATE(userProfile.name, pr);
@@ -156,29 +157,68 @@ B. Trả lời 10 câu trắc nghiệm nhanh`;
                 autoSpeak(resumeMsg);
             }, 800);
         } else {
-            const returning = `Chào ${userProfile.name}! Còn ${diff} ngày nữa là thi. Hôm nay em muốn ôn gì?`;
-            timerId = setTimeout(() => {
-                setMessages([{ role: 'assistant', content: returning }]);
-                playNotification();
-                autoSpeak(returning);
-            }, 800);
+            // Check if there's an active lesson to resume
+            const activeLesson = userProfile.activeLesson;
+            if (activeLesson && activeLesson.sectionId && activeLesson.lessonId) {
+                // Check if lesson is not completed
+                const lessonKey = `${activeLesson.sectionId}-${activeLesson.lessonId}`;
+                const lessonProgress = userProfile.lessonProgress?.[lessonKey];
+                if (lessonProgress && lessonProgress.status !== 'completed') {
+                    // Find lesson info for greeting
+                    const found = findLesson(activeLesson.sectionId, activeLesson.lessonId);
+                    if (found) {
+                        const { section, lesson } = found;
+                        setAwaitingResumeChoice(true);
+                        const resumeLessonMsg = `Chào ${userProfile.name}! Còn ${diff} ngày nữa là thi.
+
+Trong bài học lần trước, ${pr} và em đã học đến phần "${lesson.title}" trong chủ đề "${section.title}". Em đã hoàn thành ${lessonProgress.sectionsDone}/${lessonProgress.sectionsTotal} phần.
+
+Em có muốn tiếp tục học bài này không, hay muốn trao đổi về vấn đề khác?
+
+**A.** Tiếp tục học bài hôm trước
+**B.** Trao đổi vấn đề khác`;
+                        timerId = setTimeout(() => {
+                            setMessages([{ role: 'assistant', content: resumeLessonMsg }]);
+                            playNotification();
+                            autoSpeak(resumeLessonMsg);
+                        }, 800);
+                    } else {
+                        // Lesson not found, clear it and show normal greeting
+                        if (user) clearActiveLesson(user.uid).catch(console.error);
+                        const returning = `Chào ${userProfile.name}! Còn ${diff} ngày nữa là thi. Hôm nay em muốn ôn gì?`;
+                        timerId = setTimeout(() => {
+                            setMessages([{ role: 'assistant', content: returning }]);
+                            playNotification();
+                            autoSpeak(returning);
+                        }, 800);
+                    }
+                } else {
+                    // Lesson is completed, clear it and show normal greeting
+                    if (user) clearActiveLesson(user.uid).catch(console.error);
+                    const returning = `Chào ${userProfile.name}! Còn ${diff} ngày nữa là thi. Hôm nay em muốn ôn gì?`;
+                    timerId = setTimeout(() => {
+                        setMessages([{ role: 'assistant', content: returning }]);
+                        playNotification();
+                        autoSpeak(returning);
+                    }, 800);
+                }
+            } else {
+                // No active lesson, normal greeting
+                const returning = `Chào ${userProfile.name}! Còn ${diff} ngày nữa là thi. Hôm nay em muốn ôn gì?`;
+                timerId = setTimeout(() => {
+                    setMessages([{ role: 'assistant', content: returning }]);
+                    playNotification();
+                    autoSpeak(returning);
+                }, 800);
+            }
         }
 
         return () => clearTimeout(timerId);
     }, [userProfile?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // ── Load chat memory from Firebase on mount ────────────────────────────
-    const memoryLoadedRef = useRef(false);
-    useEffect(() => {
-        if (!user || memoryLoadedRef.current) return;
-        memoryLoadedRef.current = true;
-        loadChatMemory(user.uid).then((saved: Message[]) => {
-            if (saved && saved.length > 0) {
-                // Prepend saved memory before any greeting
-                setMessages(prev => prev.length === 0 ? saved : prev);
-            }
-        });
-    }, [user]);
+    // Note: Chat memory is loaded when resuming lesson, not here
+    // to avoid conflicts with greeting flow
 
     // ── Save chat memory to Firebase (debounced) ──────────────────────────
     const memorySaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -408,6 +448,54 @@ Phong cách: màu sắc ấm, chữ dễ đọc, phù hợp học sinh ôn thi t
             return;
         }
 
+        // ── Resume lesson choice ──────────────────────────────────────────────
+        if (awaitingResumeChoice) {
+            const choice = val.trim().toUpperCase().slice(0, 1);
+            if (choice === 'A') {
+                // User wants to resume lesson
+                setAwaitingResumeChoice(false);
+                const activeLesson = userProfile?.activeLesson;
+                if (activeLesson && activeLesson.sectionId && activeLesson.lessonId) {
+                    // Load chat memory first
+                    const savedMessages = await loadChatMemory(user!.uid);
+                    if (savedMessages && savedMessages.length > 0) {
+                        setMessages(savedMessages);
+                    }
+                    // Resume lesson in resume mode (don't clear messages, don't show intro)
+                    await startLesson(activeLesson.sectionId, activeLesson.lessonId, true);
+                    // Add a reminder message about where we left off
+                    const found = findLesson(activeLesson.sectionId, activeLesson.lessonId);
+                    if (found) {
+                        const { section, lesson } = found;
+                        const lessonKey = getLessonKey(activeLesson.sectionId, activeLesson.lessonId);
+                        const lp = userProfile?.lessonProgress?.[lessonKey];
+                        if (lp) {
+                            const currentSection = (lp.currentSectionIndex ?? lp.sectionsDone) + 1;
+                            const resumeMsg = `Tiếp tục học bài "${lesson.title}" trong chủ đề "${section.title}". 
+
+Trong bài học lần trước, thầy và em đã học đến phần thứ ${currentSection}/${lp.sectionsTotal} (đã hoàn thành ${lp.sectionsDone}/${lp.sectionsTotal} phần). Thầy sẽ nhắc lại ngắn gọn nội dung phần trước rồi tiếp tục giảng phần tiếp theo nhé.`;
+                            addAssistant(resumeMsg, false);
+                        }
+                    }
+                } else {
+                    addAssistant('Không tìm thấy bài học đang học. Em có thể chọn bài học mới từ tab Tiến Trình nhé.');
+                }
+                return;
+            }
+            if (choice === 'B') {
+                // User wants to discuss other topics
+                setAwaitingResumeChoice(false);
+                // Clear active lesson since user wants to do something else
+                if (user && userProfile?.activeLesson) {
+                    clearActiveLesson(user.uid).catch(console.error);
+                }
+                addAssistant('Được rồi, em muốn trao đổi về vấn đề gì?');
+                return;
+            }
+            addAssistant('Em gõ **A** để tiếp tục học bài hôm trước hoặc **B** để trao đổi vấn đề khác nhé.');
+            return;
+        }
+
         // ── Inline quiz flow ──────────────────────────────────────────────────
         if (quizState.phase === 'reading') {
             if (val.toLowerCase().includes('bắt đầu') || val.toLowerCase() === 'bt' || val === '1') {
@@ -472,7 +560,19 @@ Phong cách: màu sắc ấm, chữ dễ đọc, phù hợp học sinh ôn thi t
             // Build enhanced prompt with lesson context + user memory
             let effectiveInput = val;
             if (activeLesson) {
-                effectiveInput = `${LESSON_TEACH_PROMPT}\n\n[NỘI DUNG LÝ THUYẾT]:\n${activeLesson.docxContent}\n\n[CÂU TRẢ LỜI CỦA HỌC SINH]: ${val}`;
+                const lessonKey = getLessonKey(activeLesson.sectionId, activeLesson.lessonId);
+                const lp = userProfile?.lessonProgress?.[lessonKey];
+                const currentSectionIndex = lp?.currentSectionIndex ?? 0;
+                const sectionsDone = lp?.sectionsDone ?? 0;
+                const sectionsTotal = lp?.sectionsTotal ?? 10;
+                
+                // Add resume context if continuing from a previous session
+                let resumeContext = '';
+                if (sectionsDone > 0 && currentSectionIndex > 0) {
+                    resumeContext = `\n\n[TIẾP TỤC BÀI HỌC]: Em đã học xong ${sectionsDone}/${sectionsTotal} phần. Hiện tại đang học phần thứ ${currentSectionIndex + 1}. Hãy tiếp tục từ phần tiếp theo, nhắc lại ngắn gọn (1-2 câu) nội dung phần trước đó rồi tiếp tục giảng phần mới.\n`;
+                }
+                
+                effectiveInput = `${LESSON_TEACH_PROMPT}${resumeContext}\n\n[NỘI DUNG LÝ THUYẾT]:\n${activeLesson.docxContent}\n\n[CÂU TRẢ LỜI CỦA HỌC SINH]: ${val}`;
             }
             // Inject user memory/traits for personalization
             const traits = userProfile?.userTraits;
@@ -544,6 +644,7 @@ Phong cách: màu sắc ấm, chữ dễ đọc, phù hợp học sinh ôn thi t
                     const lessonKey = getLessonKey(activeLesson.sectionId, activeLesson.lessonId);
                     const lp = userProfile.lessonProgress?.[lessonKey] || {
                         status: 'in_progress' as const, sectionsTotal: 10, sectionsDone: 0,
+                        currentSectionIndex: 0,
                         questionsAsked: 0, questionsCorrect: 0,
                     };
                     let changed = false;
@@ -556,13 +657,19 @@ Phong cách: màu sắc ấm, chữ dễ đọc, phù hợp học sinh ôn thi t
                     if (cleanContent.includes('[SECTION_DONE]')) {
                         cleanContent = cleanContent.replace(/\[SECTION_DONE\]/g, '').trim();
                         lp.sectionsDone += 1;
+                        lp.currentSectionIndex = (lp.currentSectionIndex || 0) + 1;
                         changed = true;
                     }
                     if (cleanContent.includes('[LESSON_DONE]')) {
                         cleanContent = cleanContent.replace(/\[LESSON_DONE\]/g, '').trim();
                         lp.status = 'completed';
                         lp.sectionsDone = lp.sectionsTotal;
+                        lp.currentSectionIndex = lp.sectionsTotal;
                         setActiveLesson(null);
+                        // Clear active lesson from Firebase when completed
+                        if (user) {
+                            clearActiveLesson(user.uid).catch(console.error);
+                        }
                         changed = true;
                     }
                     if (changed) {
@@ -711,29 +818,42 @@ Phong cách: màu sắc ấm, chữ dễ đọc, phù hợp học sinh ôn thi t
     };
 
     // ── Start lesson flow ───────────────────────────────────────────────────
-    const startLesson = useCallback(async (sectionId: string, lessonId: string) => {
+    const startLesson = useCallback(async (sectionId: string, lessonId: string, resumeMode = false) => {
         const found = findLesson(sectionId, lessonId);
         if (!found) return;
         const { lesson } = found;
 
-        // Clear existing messages and show intro
-        setMessages([]);
-        addAssistant(`Sau đây thầy sẽ cùng em bắt đầu học bài: "${lesson.title}" nhé. Em đã sẵn sàng chưa?`);
+        // Clear existing messages and show intro (only if not resuming)
+        if (!resumeMode) {
+            setMessages([]);
+            addAssistant(`Sau đây thầy sẽ cùng em bắt đầu học bài: "${lesson.title}" nhé. Em đã sẵn sàng chưa?`);
+        }
 
         // Fetch DOCX content
         try {
             const docxContent = await fetchDocxAsText(lesson.docxPath);
             setActiveLesson({ sectionId, lessonId, docxContent });
 
-            // Mark lesson as in_progress in Firebase
+            // Save active lesson to Firebase (clear old one first if starting new lesson)
             if (user) {
+                // If starting a new lesson (not resuming), clear any old active lesson first
+                if (!resumeMode && userProfile?.activeLesson) {
+                    await clearActiveLesson(user.uid);
+                }
+                await saveActiveLesson(user.uid, sectionId, lessonId);
+                
                 const key = getLessonKey(sectionId, lessonId);
                 const existing = userProfile?.lessonProgress?.[key];
+                
+                // Estimate sectionsTotal from content
+                const estimatedSections = estimateSectionCount(docxContent);
+                
                 if (!existing || existing.status === 'not_started') {
                     const lp = {
                         status: 'in_progress' as const,
-                        sectionsTotal: 10, // will be refined as AI teaches
+                        sectionsTotal: estimatedSections,
                         sectionsDone: 0,
+                        currentSectionIndex: 0,
                         questionsAsked: 0,
                         questionsCorrect: 0,
                     };
@@ -741,6 +861,19 @@ Phong cách: màu sắc ấm, chữ dễ đọc, phù hợp học sinh ôn thi t
                     setUserProfile(p => p ? {
                         ...p,
                         lessonProgress: { ...p.lessonProgress, [key]: lp },
+                        activeLesson: { sectionId, lessonId },
+                    } : p);
+                } else {
+                    // Update activeLesson and sectionsTotal if needed
+                    const updatedLp = {
+                        ...existing,
+                        sectionsTotal: existing.sectionsTotal < estimatedSections ? estimatedSections : existing.sectionsTotal,
+                    };
+                    updateLessonProgress(user.uid, key, updatedLp).catch(console.error);
+                    setUserProfile(p => p ? {
+                        ...p,
+                        lessonProgress: { ...p.lessonProgress, [key]: updatedLp },
+                        activeLesson: { sectionId, lessonId },
                     } : p);
                 }
             }

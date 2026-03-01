@@ -340,3 +340,17 @@ export async function updateLessonProgress(uid: string, lessonKey: string, progr
         [`lessonProgress.${lessonKey}`]: progress,
     });
 }
+
+/** Save currently active lesson to resume later */
+export async function saveActiveLesson(uid: string, sectionId: string, lessonId: string) {
+    await updateDoc(doc(db, 'users', uid), {
+        activeLesson: { sectionId, lessonId },
+    });
+}
+
+/** Clear active lesson (when lesson is completed or user starts new lesson) */
+export async function clearActiveLesson(uid: string) {
+    await updateDoc(doc(db, 'users', uid), {
+        activeLesson: null,
+    });
+}
